@@ -45,14 +45,14 @@ async function callLLM(messages) {
   return data.choices[0].message;
 }
 
-async function runAgent(prompt) {
+async function runAgent(history) {
   const messages = [
     {
       role: "system",
       content:
         "You are a helpful agent with access to a web_search tool. Use it whenever the user's request needs current or factual information you're not certain about. Cite sources briefly when you use search results.",
     },
-    { role: "user", content: prompt },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
   const searches = [];

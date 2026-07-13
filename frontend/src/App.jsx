@@ -1,103 +1,137 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Sidebar from "./Sidebar";
+import Message from "./Message";
+import { listConversations, getConversation, createConversation, addMessage } from "./api";
 import "./App.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
 function App() {
-  const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
-  const [searches, setSearches] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   const textareaRef = useRef(null);
+  const threadEndRef = useRef(null);
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const data = await listConversations();
+      setConversations(data.conversations);
+    } catch {
+      // sidebar list failing silently is acceptable; the composer still works
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
 
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
-  }, [prompt]);
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [draft]);
+
+  useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  async function handleSelect(id) {
+    setError("");
+    setActiveId(id);
+    try {
+      const data = await getConversation(id);
+      setMessages(data.conversation.messages);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function handleNewChat() {
+    setActiveId(null);
+    setMessages([]);
+    setError("");
+    setDraft("");
+    textareaRef.current?.focus();
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!prompt.trim() || loading) return;
+    const text = draft.trim();
+    if (!text || loading) return;
 
-    setLoading(true);
+    setDraft("");
     setError("");
-    setResponse("");
-    setSearches([]);
+    setLoading(true);
+    setMessages((prev) => [...prev, { role: "user", content: text, searches: [] }]);
 
     try {
-      const res = await fetch(`${API_URL}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
+      const data = activeId
+        ? await addMessage(activeId, text)
+        : await createConversation(text);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Something went wrong");
+      setMessages(data.conversation.messages);
+      if (!activeId) {
+        setActiveId(data.conversation._id);
       }
-
-      setResponse(data.response);
-      setSearches(data.searches || []);
+      refreshConversations();
     } catch (err) {
       setError(err.message);
+      setMessages((prev) => prev.slice(0, -1));
+      setDraft(text);
     } finally {
       setLoading(false);
     }
   }
 
   function handleKeyDown(e) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       handleSubmit(e);
     }
   }
 
-  const totalResults = searches.reduce((n, s) => n + (s.results?.length || 0), 0);
-
   return (
-    <div className="page">
-      <div className="rail" aria-hidden="true" />
+    <div className="app">
+      <Sidebar
+        conversations={conversations}
+        activeId={activeId}
+        onSelect={handleSelect}
+        onNewChat={handleNewChat}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((v) => !v)}
+      />
 
-      <div className="container">
-        <header className="masthead">
-          <div className="mark">
-            <span className="mark-dot" data-live={loading} />
-            <span className="mark-text">SCOUT</span>
+      <main className="chat-pane">
+        {messages.length === 0 ? (
+          <div className="empty-state">
+            <div className="mark-dot" data-live={loading} />
+            <h1>What do you want to know?</h1>
+            <p>Scout reaches out to the live web when your question needs a current answer.</p>
           </div>
-          <p className="tagline">web search agent · live trace</p>
-        </header>
-
-        <form onSubmit={handleSubmit} className="prompt-form">
-          <label htmlFor="prompt-input" className="field-label">
-            Query
-          </label>
-          <textarea
-            id="prompt-input"
-            ref={textareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask something that needs a current answer…"
-            rows={1}
-            disabled={loading}
-          />
-          <div className="form-row">
-            <span className="hint">⌘/Ctrl + Enter to send</span>
-            <button type="submit" disabled={loading || !prompt.trim()}>
-              {loading ? (
-                <>
-                  <span className="spinner" />
-                  Running
-                </>
-              ) : (
-                "Run query →"
-              )}
-            </button>
+        ) : (
+          <div className="thread">
+            {messages.map((m, i) => (
+              <Message key={m._id || i} role={m.role} content={m.content} searches={m.searches} />
+            ))}
+            {loading && (
+              <div className="message" data-role="assistant">
+                <div className="message-role">Scout</div>
+                <div className="message-bubble">
+                  <div className="thinking">
+                    <span className="spinner" />
+                    Thinking
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={threadEndRef} />
           </div>
-        </form>
+        )}
 
         {error && (
           <div className="error" role="alert">
@@ -106,46 +140,22 @@ function App() {
           </div>
         )}
 
-        {response && (
-          <section className="result">
-            <div className="result-header">
-              <span className="result-label">Response</span>
-              {searches.length > 0 && (
-                <span className="result-meta">
-                  {searches.length} search{searches.length !== 1 ? "es" : ""} · {totalResults} source
-                  {totalResults !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-            <p className="response-text">{response}</p>
-
-            {searches.length > 0 && (
-              <div className="trace">
-                <div className="trace-heading">Search trace</div>
-                <ol className="trace-list">
-                  {searches.map((s, i) => (
-                    <li key={i} className="trace-item">
-                      <div className="trace-query">
-                        <span className="trace-glyph">↗</span>
-                        {s.query}
-                      </div>
-                      <ul className="trace-results">
-                        {(s.results || []).map((r, j) => (
-                          <li key={j}>
-                            <a href={r.url} target="_blank" rel="noreferrer">
-                              {r.title}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-          </section>
-        )}
-      </div>
+        <form onSubmit={handleSubmit} className="composer">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask Scout something…"
+            rows={1}
+            disabled={loading}
+          />
+          <button type="submit" disabled={loading || !draft.trim()} aria-label="Send message">
+            {loading ? <span className="spinner" /> : "↑"}
+          </button>
+        </form>
+        <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
+      </main>
     </div>
   );
 }

@@ -8,11 +8,19 @@ const searchCallSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const messageSchema = new mongoose.Schema(
+  {
+    role: { type: String, enum: ["user", "assistant"], required: true },
+    content: { type: String, required: true },
+    searches: { type: [searchCallSchema], default: [] },
+  },
+  { timestamps: true }
+);
+
 const conversationSchema = new mongoose.Schema(
   {
-    prompt: { type: String, required: true },
-    response: { type: String, required: true },
-    searches: { type: [searchCallSchema], default: [] },
+    title: { type: String, required: true },
+    messages: { type: [messageSchema], default: [] },
   },
   { timestamps: true }
 );
