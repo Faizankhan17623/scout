@@ -1,13 +1,3 @@
-function formatWhen(iso) {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 function Sidebar({
   conversations,
   activeId,
@@ -38,19 +28,30 @@ function Sidebar({
             aria-label="Collapse sidebar"
             tabIndex={collapsed ? -1 : 0}
           >
-            «
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+              <rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <line x1="7.8" y1="3.5" x2="7.8" y2="16.5" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
           </button>
         </div>
 
-        <button
-          type="button"
-          className="new-chat"
-          onClick={onNewChat}
-          tabIndex={collapsed ? -1 : 0}
-        >
-          <span className="new-chat-glyph">+</span>
-          New chat
-        </button>
+        <nav className="sidebar-nav">
+          <button type="button" className="nav-row" onClick={onNewChat} tabIndex={collapsed ? -1 : 0}>
+            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 4v12M4 10h12"
+              />
+            </svg>
+            New chat
+          </button>
+        </nav>
+
+        <div className="conversation-section-label">Chats</div>
 
         <nav className="conversation-list" aria-label="Conversation history">
           {conversations.length === 0 && (
@@ -66,7 +67,6 @@ function Sidebar({
               tabIndex={collapsed ? -1 : 0}
             >
               <span className="conversation-title">{c.title || "Untitled"}</span>
-              <span className="conversation-time">{formatWhen(c.updatedAt)}</span>
               <span
                 className="conversation-delete"
                 role="button"

@@ -132,14 +132,14 @@
 }
 
 .sidebar-toggle {
+  display: grid;
+  place-items: center;
   background: transparent;
   border: none;
   color: var(--fg-dim);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
   cursor: pointer;
-  padding: 0.2rem 0.45rem;
-  border-radius: 4px;
+  padding: 0.35rem;
+  border-radius: 5px;
 }
 
 .sidebar-toggle:hover {
@@ -147,37 +147,51 @@
   color: var(--fg);
 }
 
-.new-chat {
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+}
+
+.nav-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  gap: 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: 7px;
   background: transparent;
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: 0.86rem;
-  font-weight: 600;
+  font-weight: 500;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.12s ease;
 }
 
-.new-chat:hover {
-  border-color: var(--signal);
-  background: color-mix(in srgb, var(--signal) 8%, transparent);
+.nav-row:hover {
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
-.new-chat-glyph {
+.nav-row svg {
   color: var(--signal);
-  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.conversation-section-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  padding: 0.6rem 0.6rem 0.4rem;
 }
 
 .conversation-list {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
   overflow-y: auto;
   flex: 1;
 }
@@ -186,18 +200,16 @@
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--fg-dim);
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.6rem;
 }
 
 .conversation-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "title meta";
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.75rem;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--fg);
   text-align: left;
@@ -214,28 +226,16 @@
 }
 
 .conversation-title {
-  grid-area: title;
+  flex: 1;
   font-size: 0.85rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-time,
-.conversation-delete {
-  flex-shrink: 0;
-  grid-area: meta;
-}
-
-.conversation-time {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-
 .conversation-delete {
   display: none;
+  flex-shrink: 0;
   width: 22px;
   height: 22px;
   align-items: center;
@@ -243,10 +243,6 @@
   border-radius: 5px;
   color: var(--fg-dim);
   transition: color 0.15s ease, background 0.15s ease;
-}
-
-.conversation-item:hover .conversation-time {
-  display: none;
 }
 
 .conversation-item:hover .conversation-delete,
