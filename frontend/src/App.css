@@ -117,6 +117,12 @@
   padding: 0.25rem 0.5rem 1.1rem;
 }
 
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .mark-text {
   font-family: var(--font-mono);
   font-size: 0.95rem;

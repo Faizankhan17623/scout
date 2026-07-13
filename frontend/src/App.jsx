@@ -127,6 +127,7 @@ function App() {
         onDelete={handleDelete}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((v) => !v)}
+        loading={loading}
       />
 
       <main className="chat-pane">
@@ -143,7 +144,6 @@ function App() {
 
         {messages.length === 0 ? (
           <div className="empty-state">
-            <div className="mark-dot" data-live={loading} />
             <h1>What do you want to know?</h1>
             <p>Scout reaches out to the live web when your question needs a current answer.</p>
           </div>

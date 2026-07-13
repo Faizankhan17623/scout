@@ -16,6 +16,7 @@ function Sidebar({
   onDelete,
   collapsed,
   onToggle,
+  loading,
 }) {
   function handleDelete(e, id) {
     e.stopPropagation();
@@ -27,6 +28,7 @@ function Sidebar({
       <div className="sidebar-inner" inert={collapsed ? "" : undefined}>
         <div className="sidebar-top">
           <div className="mark">
+            <span className="mark-dot" data-live={loading} />
             <span className="mark-text">SCOUT</span>
           </div>
           <button
