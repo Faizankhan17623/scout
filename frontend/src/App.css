@@ -362,6 +362,7 @@
 .thread {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -376,6 +377,7 @@
   flex-direction: column;
   gap: 0.35rem;
   max-width: 80%;
+  min-width: 0;
 }
 
 .message[data-role="user"] {
@@ -400,6 +402,8 @@
 .message-bubble {
   border-radius: 12px;
   padding: 0.8rem 1rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .message[data-role="user"] .message-bubble {
