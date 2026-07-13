@@ -149,21 +149,23 @@ function App() {
           </div>
         ) : (
           <div className="thread">
-            {messages.map((m, i) => (
-              <Message key={m._id || i} role={m.role} content={m.content} searches={m.searches} />
-            ))}
-            {loading && (
-              <div className="message" data-role="assistant">
-                <div className="message-role">Scout</div>
-                <div className="message-bubble">
-                  <div className="thinking">
-                    <span className="spinner" />
-                    Thinking
+            <div className="thread-inner">
+              {messages.map((m, i) => (
+                <Message key={m._id || i} role={m.role} content={m.content} searches={m.searches} />
+              ))}
+              {loading && (
+                <div className="message" data-role="assistant">
+                  <div className="message-role">Scout</div>
+                  <div className="message-bubble">
+                    <div className="thinking">
+                      <span className="spinner" />
+                      Thinking
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            <div ref={threadEndRef} />
+              )}
+              <div ref={threadEndRef} />
+            </div>
           </div>
         )}
 
