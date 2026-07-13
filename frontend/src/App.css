@@ -375,7 +375,7 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 2rem 1.5rem 1rem;
-  max-width: 760px;
+  max-width: 980px;
   width: 100%;
   min-width: 0;
 }
@@ -384,7 +384,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  max-width: 80%;
+  max-width: 90%;
   min-width: 0;
 }
 
@@ -420,9 +420,6 @@
 
 .message[data-role="assistant"] .message-bubble {
   background: transparent;
-  border-left: 2px solid var(--signal-dim);
-  border-radius: 0;
-  padding-left: 1rem;
 }
 
 .message-text {
@@ -632,7 +629,7 @@
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  max-width: 760px;
+  max-width: 980px;
   margin: 0 0 0.75rem;
   padding: 0.7rem 0.9rem;
   border-radius: 8px;
@@ -660,7 +657,7 @@
   align-items: flex-end;
   gap: 0.6rem;
   width: 100%;
-  max-width: 760px;
+  max-width: 980px;
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 14px;
