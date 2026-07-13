@@ -130,6 +130,17 @@ function App() {
       />
 
       <main className="chat-pane">
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            className="sidebar-reopen"
+            onClick={() => setSidebarCollapsed(false)}
+            aria-label="Expand sidebar"
+          >
+            »
+          </button>
+        )}
+
         {messages.length === 0 ? (
           <div className="empty-state">
             <div className="mark-dot" data-live={loading} />
