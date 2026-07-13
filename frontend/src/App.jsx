@@ -45,7 +45,7 @@ function App() {
     setActiveId(id);
     try {
       const data = await getConversation(id);
-      setMessages(data.conversation.messages);
+      setMessages(data.conversation.messages || []);
     } catch (err) {
       setError(err.message);
     }
@@ -74,7 +74,7 @@ function App() {
         ? await addMessage(activeId, text)
         : await createConversation(text);
 
-      setMessages(data.conversation.messages);
+      setMessages(data.conversation.messages || []);
       if (!activeId) {
         setActiveId(data.conversation._id);
       }
