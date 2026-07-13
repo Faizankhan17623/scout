@@ -1,11 +1,16 @@
+import ImageSlider from "./ImageSlider";
+
 function Message({ role, content, searches = [] }) {
   const totalResults = searches.reduce((n, s) => n + (s.results?.length || 0), 0);
+  const images = searches.flatMap((s) => s.images || []);
 
   return (
     <div className="message" data-role={role}>
       <div className="message-role">{role === "user" ? "You" : "Scout"}</div>
       <div className="message-bubble">
         <p className="message-text">{content}</p>
+
+        {images.length > 0 && <ImageSlider images={images} />}
 
         {searches.length > 0 && (
           <div className="trace">

@@ -10,6 +10,8 @@ async function webSearch(query) {
       query,
       max_results: 5,
       search_depth: "basic",
+      include_images: true,
+      include_image_descriptions: true,
     },
     {
       headers: {
@@ -19,11 +21,17 @@ async function webSearch(query) {
     }
   );
 
-  return (data.results || []).map((r) => ({
+  const results = (data.results || []).map((r) => ({
     title: r.title,
     url: r.url,
     content: r.content,
   }));
+
+  const images = (data.images || [])
+    .filter((img) => img.url)
+    .map((img) => ({ url: img.url, description: img.description || "" }));
+
+  return { results, images };
 }
 
 module.exports = { webSearch };

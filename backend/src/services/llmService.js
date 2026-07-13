@@ -72,8 +72,9 @@ async function runAgent(history) {
       let results = [];
 
       if (toolCall.function.name === "web_search") {
-        results = await webSearch(args.query);
-        searches.push({ query: args.query, results });
+        const searchData = await webSearch(args.query);
+        results = searchData.results;
+        searches.push({ query: args.query, results, images: searchData.images });
       }
 
       messages.push({

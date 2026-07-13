@@ -51,6 +51,16 @@ async function createConversation(req, res) {
   }
 }
 
+async function deleteConversation(req, res) {
+  const conversation = await Conversation.findByIdAndDelete(req.params.id);
+
+  if (!conversation) {
+    return res.status(404).json({ error: "Conversation not found" });
+  }
+
+  return res.status(204).send();
+}
+
 async function addMessage(req, res) {
   const { message } = req.body;
 
@@ -85,4 +95,10 @@ async function addMessage(req, res) {
   }
 }
 
-module.exports = { listConversations, getConversation, createConversation, addMessage };
+module.exports = {
+  listConversations,
+  getConversation,
+  createConversation,
+  deleteConversation,
+  addMessage,
+};

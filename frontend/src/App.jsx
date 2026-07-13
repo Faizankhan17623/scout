@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import Sidebar from "./Sidebar";
 import Message from "./Message";
-import { listConversations, getConversation, createConversation, addMessage } from "./api";
+import {
+  listConversations,
+  getConversation,
+  createConversation,
+  addMessage,
+  deleteConversation,
+} from "./api";
 import "./App.css";
 
 function App() {
@@ -59,6 +65,22 @@ function App() {
     textareaRef.current?.focus();
   }
 
+  async function handleDelete(id) {
+    const previous = conversations;
+    setConversations((prev) => prev.filter((c) => c._id !== id));
+
+    if (id === activeId) {
+      handleNewChat();
+    }
+
+    try {
+      await deleteConversation(id);
+    } catch (err) {
+      setConversations(previous);
+      setError(err.message);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const text = draft.trim();
@@ -102,6 +124,7 @@ function App() {
         activeId={activeId}
         onSelect={handleSelect}
         onNewChat={handleNewChat}
+        onDelete={handleDelete}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((v) => !v)}
       />

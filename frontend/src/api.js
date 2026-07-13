@@ -5,6 +5,11 @@ async function request(path, options) {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
+
+  if (res.status === 204) {
+    return null;
+  }
+
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || "Something went wrong");
@@ -32,4 +37,8 @@ export function addMessage(id, message) {
     method: "POST",
     body: JSON.stringify({ message }),
   });
+}
+
+export function deleteConversation(id) {
+  return request(`/conversations/${id}`, { method: "DELETE" });
 }
