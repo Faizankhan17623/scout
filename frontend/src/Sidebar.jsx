@@ -15,7 +15,7 @@ function Sidebar({
 
   return (
     <aside className="sidebar" data-collapsed={collapsed} aria-hidden={collapsed}>
-      <div className="sidebar-inner" inert={collapsed ? "" : undefined}>
+      <div className="sidebar-inner" inert={collapsed}>
         <div className="sidebar-top">
           <div className="mark">
             <span className="mark-dot" data-live={loading} />

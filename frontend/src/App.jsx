@@ -169,28 +169,30 @@ function App() {
           </div>
         )}
 
-        {error && (
-          <div className="error" role="alert">
-            <span className="error-glyph">!</span>
-            {error}
-          </div>
-        )}
+        <div className="composer-bar">
+          {error && (
+            <div className="error" role="alert">
+              <span className="error-glyph">!</span>
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="composer">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Scout something…"
-            rows={1}
-            disabled={loading}
-          />
-          <button type="submit" disabled={loading || !draft.trim()} aria-label="Send message">
-            {loading ? <span className="spinner" /> : "↑"}
-          </button>
-        </form>
-        <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
+          <form onSubmit={handleSubmit} className="composer">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Scout something…"
+              rows={1}
+              disabled={loading}
+            />
+            <button type="submit" disabled={loading || !draft.trim()} aria-label="Send message">
+              {loading ? <span className="spinner" /> : "↑"}
+            </button>
+          </form>
+          <p className="composer-hint">Enter to send · Shift+Enter for a new line</p>
+        </div>
       </main>
     </div>
   );
