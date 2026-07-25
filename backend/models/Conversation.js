@@ -34,6 +34,7 @@ const messageSchema = new mongoose.Schema(
     content: { type: String, required: true },
     searches: { type: [searchCallSchema], default: [] },
     toolCalls: { type: [toolCallSchema], default: [] },
+    followUps: { type: [String], default: [] },
   },
   { timestamps: true }
 );
@@ -42,6 +43,7 @@ const conversationSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     messages: { type: [messageSchema], default: [] },
+    sessionToken: { type: String, required: true, index: true },
   },
   { timestamps: true }
 );

@@ -247,16 +247,20 @@ async function streamLLM(messages, onToken) {
 }
 
 const SYSTEM_PROMPT =
-  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it.";
+  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it. If the user's message includes an 'Attached file:' section, treat its content as the primary, authoritative source for answering — prefer it over web_search or prior knowledge, since it's exactly what the user wants discussed.";
 
-function buildMessages(history) {
+const DEEP_RESEARCH_SUFFIX =
+  " Deep research mode is ON: this question needs a thorough answer. Before answering, use web_search multiple times with different, complementary queries to cover the topic from several angles, and use read_page on the most promising results to get full context rather than relying on snippets alone. Then produce a well-organized, structured report with headings and a brief summary of sources — not a short answer.";
+
+function buildMessages(history, { deepResearch = false } = {}) {
   return [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: deepResearch ? SYSTEM_PROMPT + DEEP_RESEARCH_SUFFIX : SYSTEM_PROMPT },
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 }
 
 const MAX_TOOL_ROUNDS = 5;
+const MAX_TOOL_ROUNDS_DEEP = 10;
 
 // Each handler receives the parsed tool-call arguments and returns
 // { result, forLLM, images? }. `forLLM` is what gets serialized back to the
@@ -333,12 +337,13 @@ async function executeToolCalls(message, messages, searches, toolCalls) {
 // (observed under rate-limit pressure with small/fast models). Retrying
 // once is enough in practice; if it happens twice in a row, surface a
 // clear error instead of persisting an empty assistant message.
-async function runAgent(history) {
-  const messages = buildMessages(history);
+async function runAgent(history, { deepResearch = false } = {}) {
+  const messages = buildMessages(history, { deepResearch });
   const searches = [];
   const toolCalls = [];
+  const maxRounds = deepResearch ? MAX_TOOL_ROUNDS_DEEP : MAX_TOOL_ROUNDS;
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+  for (let round = 0; round < maxRounds; round += 1) {
     let message = await callLLM(messages);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
@@ -362,12 +367,13 @@ async function runAgent(history) {
 // Same as runAgent, but streams tokens as the final answer is produced.
 // Tool-calling rounds happen silently (no tokens emitted) since Groq does
 // not stream tool-call arguments as readable text.
-async function runAgentStream(history, onToken) {
-  const messages = buildMessages(history);
+async function runAgentStream(history, onToken, { deepResearch = false } = {}) {
+  const messages = buildMessages(history, { deepResearch });
   const searches = [];
   const toolCalls = [];
+  const maxRounds = deepResearch ? MAX_TOOL_ROUNDS_DEEP : MAX_TOOL_ROUNDS;
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+  for (let round = 0; round < maxRounds; round += 1) {
     let message = await streamLLM(messages, onToken);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
@@ -388,4 +394,79 @@ async function runAgentStream(history, onToken) {
   throw new Error("Agent exceeded maximum tool-call rounds");
 }
 
-module.exports = { runAgent, runAgentStream };
+// Produces a short, human-friendly conversation title from the first
+// exchange. Runs without tools (single quick completion) and is best-effort
+// — callers should fall back to a truncated title if this fails.
+async function generateTitle(userMessage, assistantResponse) {
+  try {
+    const { data } = await axios.post(
+      GROQ_URL,
+      {
+        model: env.llmModel,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Write a short conversation title (max 6 words, no quotes, no trailing period) summarizing the topic of this exchange. Reply with only the title.",
+          },
+          { role: "user", content: `User: ${userMessage}\nAssistant: ${(assistantResponse || "").slice(0, 500)}` },
+        ],
+        max_tokens: 20,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${env.llmApiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const title = data.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, "");
+    return title || null;
+  } catch {
+    return null;
+  }
+}
+
+// Suggests 2-3 short follow-up questions a user might ask next, based on
+// the latest exchange. Best-effort — callers should treat a failure as
+// "no suggestions" rather than surfacing an error.
+async function generateFollowUps(userMessage, assistantResponse) {
+  try {
+    const { data } = await axios.post(
+      GROQ_URL,
+      {
+        model: env.llmModel,
+        messages: [
+          {
+            role: "system",
+            content:
+              'Suggest 2-3 short, natural follow-up questions the user might ask next, based on this exchange. Reply with ONLY a JSON object of the exact shape {"questions": ["question one", "question two"]}. No other text.',
+          },
+          { role: "user", content: `User: ${userMessage}\nAssistant: ${(assistantResponse || "").slice(0, 800)}` },
+        ],
+        max_tokens: 150,
+        response_format: { type: "json_object" },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${env.llmApiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const raw = data.choices[0]?.message?.content;
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed) ? parsed : Object.values(parsed).find((v) => Array.isArray(v));
+    if (!Array.isArray(list)) return [];
+
+    return list.filter((q) => typeof q === "string" && q.trim()).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
+
+module.exports = { runAgent, runAgentStream, generateTitle, generateFollowUps };

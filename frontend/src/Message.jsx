@@ -1,6 +1,12 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import ImageSlider from "./ImageSlider";
 import { speakText } from "./api";
+
+const markdownComponents = {
+  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+};
 
 function WeatherIcon({ icon, size = 22 }) {
   const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -185,18 +191,124 @@ function ListenButton({ text }) {
   );
 }
 
-function Message({ role, content, searches = [], toolCalls = [] }) {
+function EditableUserMessage({ content, onSave, onCancel }) {
+  const [value, setValue] = useState(content);
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (value.trim()) onSave(value.trim());
+    } else if (e.key === "Escape") {
+      onCancel();
+    }
+  }
+
+  return (
+    <div className="message-edit">
+      <textarea
+        ref={(el) => {
+          if (el) {
+            el.style.height = "auto";
+            el.style.height = `${el.scrollHeight}px`;
+          }
+        }}
+        value={value}
+        autoFocus
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        rows={1}
+      />
+      <div className="message-edit-actions">
+        <button type="button" className="message-edit-cancel" onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="message-edit-save"
+          disabled={!value.trim()}
+          onClick={() => onSave(value.trim())}
+        >
+          Save &amp; submit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Message({
+  role,
+  content,
+  searches = [],
+  toolCalls = [],
+  followUps = [],
+  attachedFileName,
+  onEdit,
+  onFollowUpClick,
+}) {
+  const [editing, setEditing] = useState(false);
   const totalResults = searches.reduce((n, s) => n + (s.results?.length || 0), 0);
   const searchImages = searches.flatMap((s) => s.images || []);
   const toolImages = toolCalls.flatMap((c) => c.images || []);
   const images = [...searchImages, ...toolImages];
   const cardCalls = toolCalls.filter((c) => c.kind === "weather" || c.kind === "wikipedia" || c.kind === "read_page");
 
+  if (role === "user" && editing) {
+    return (
+      <div className="message" data-role={role}>
+        <div className="message-role">You</div>
+        <div className="message-bubble message-bubble-editing">
+          <EditableUserMessage
+            content={content}
+            onCancel={() => setEditing(false)}
+            onSave={(text) => {
+              setEditing(false);
+              onEdit(text);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="message" data-role={role}>
       <div className="message-role">{role === "user" ? "You" : "Scout"}</div>
       <div className="message-bubble">
-        <p className="message-text">{content}</p>
+        {role === "user" && attachedFileName && (
+          <div className="message-attachment">
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                d="M4 2h5l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"
+              />
+            </svg>
+            {attachedFileName}
+          </div>
+        )}
+
+        {role === "assistant" ? (
+          <div className="message-text message-markdown">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {content}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <p className="message-text">{content}</p>
+        )}
+
+        {role === "user" && onEdit && (
+          <button type="button" className="message-edit-trigger" onClick={() => setEditing(true)} aria-label="Edit message">
+            <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M11.3 1.3a1 1 0 0 1 1.4 0l2 2a1 1 0 0 1 0 1.4l-7.6 7.6-3.4.9.9-3.4 6.7-6.7Zm1 2.1-1-1-6 6-.4 1.5 1.5-.4 6-6Z"
+              />
+            </svg>
+            Edit
+          </button>
+        )}
 
         {images.length > 0 && <ImageSlider images={images} />}
 
@@ -235,6 +347,16 @@ function Message({ role, content, searches = [], toolCalls = [] }) {
                 </li>
               ))}
             </ol>
+          </div>
+        )}
+
+        {role === "assistant" && followUps.length > 0 && onFollowUpClick && (
+          <div className="follow-ups">
+            {followUps.map((q, i) => (
+              <button type="button" key={i} className="follow-up-chip" onClick={() => onFollowUpClick(q)}>
+                {q}
+              </button>
+            ))}
           </div>
         )}
       </div>

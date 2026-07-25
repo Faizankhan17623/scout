@@ -1,8 +1,33 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+const SESSION_TOKEN_KEY = "scout-session-token";
+const SESSION_EXPIRY_KEY = "scout-session-expiry";
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// A random per-browser token that lets a returning visitor see their own
+// conversation history without any login — reissued if the previous one
+// expired, refreshed on every use so an active user's window keeps sliding.
+export function getSessionToken() {
+  const expiry = Number(localStorage.getItem(SESSION_EXPIRY_KEY));
+  const existing = localStorage.getItem(SESSION_TOKEN_KEY);
+
+  if (existing && expiry && Date.now() < expiry) {
+    localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + SESSION_TTL_MS));
+    return existing;
+  }
+
+  const token =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(SESSION_TOKEN_KEY, token);
+  localStorage.setItem(SESSION_EXPIRY_KEY, String(Date.now() + SESSION_TTL_MS));
+  return token;
+}
+
 async function request(path, options) {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Session-Token": getSessionToken() },
     ...options,
   });
 
@@ -47,11 +72,11 @@ export function deleteConversation(id) {
 // text chunk as it arrives, and resolves with the final conversation once
 // the "done" event is received. Throws if the server sends an "error" event
 // or the request itself fails.
-async function streamRequest(path, message, onToken) {
+async function streamRequest(path, message, onToken, { method = "POST", deepResearch = false } = {}) {
   const res = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    method,
+    headers: { "Content-Type": "application/json", "X-Session-Token": getSessionToken() },
+    body: JSON.stringify({ message, deepResearch }),
   });
 
   if (!res.ok || !res.body) {
@@ -93,12 +118,32 @@ async function streamRequest(path, message, onToken) {
   throw new Error("Stream ended unexpectedly");
 }
 
-export function createConversationStream(message, onToken) {
-  return streamRequest("/conversations", message, onToken);
+export function createConversationStream(message, onToken, deepResearch) {
+  return streamRequest("/conversations", message, onToken, { deepResearch });
 }
 
-export function addMessageStream(id, message, onToken) {
-  return streamRequest(`/conversations/${id}/messages`, message, onToken);
+export function addMessageStream(id, message, onToken, deepResearch) {
+  return streamRequest(`/conversations/${id}/messages`, message, onToken, { deepResearch });
+}
+
+export function editMessageStream(id, index, message, onToken) {
+  return streamRequest(`/conversations/${id}/messages/${index}`, message, onToken, { method: "PUT" });
+}
+
+export async function extractFileText(file) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API_URL}/files/extract`, {
+    method: "POST",
+    body: form,
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to read file");
+  }
+  return data;
 }
 
 export async function transcribeAudio(blob) {

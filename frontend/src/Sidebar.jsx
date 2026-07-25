@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const THEME_LABELS = { system: "System theme", light: "Light theme", dark: "Dark theme" };
 
 function ThemeIcon({ theme }) {
@@ -54,10 +56,16 @@ function Sidebar({
   theme,
   onCycleTheme,
 }) {
+  const [query, setQuery] = useState("");
+
   function handleDelete(e, id) {
     e.stopPropagation();
     onDelete(id);
   }
+
+  const filtered = query.trim()
+    ? conversations.filter((c) => (c.title || "").toLowerCase().includes(query.trim().toLowerCase()))
+    : conversations;
 
   return (
     <aside
@@ -102,13 +110,33 @@ function Sidebar({
           </button>
         </nav>
 
+        {conversations.length > 0 && (
+          <div className="conversation-search">
+            <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+              <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+              <line x1="10.8" y1="10.8" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search chats"
+              tabIndex={collapsed ? -1 : 0}
+              aria-label="Search conversations"
+            />
+          </div>
+        )}
+
         <div className="conversation-section-label">Chats</div>
 
         <nav className="conversation-list" aria-label="Conversation history">
           {conversations.length === 0 && (
             <p className="conversation-empty">No conversations yet</p>
           )}
-          {conversations.map((c) => (
+          {conversations.length > 0 && filtered.length === 0 && (
+            <p className="conversation-empty">No matches for "{query}"</p>
+          )}
+          {filtered.map((c) => (
             <button
               key={c._id}
               type="button"

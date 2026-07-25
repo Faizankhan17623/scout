@@ -7,7 +7,9 @@ import {
   deleteConversation,
   createConversationStream,
   addMessageStream,
+  editMessageStream,
   transcribeAudio,
+  extractFileText,
 } from "./api";
 import "./App.css";
 
@@ -40,11 +42,15 @@ function App() {
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("scout-theme") || "system");
+  const [deepResearch, setDeepResearch] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [attaching, setAttaching] = useState(false);
 
   const textareaRef = useRef(null);
   const threadEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const fileInputRef = useRef(null);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -176,25 +182,42 @@ function App() {
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const text = draft.trim();
+  async function submitMessage(text, file) {
     if (!text || loading) return;
 
-    setDraft("");
     setError("");
     setLoading(true);
     setStreamingText("");
-    setMessages((prev) => [...prev, { role: "user", content: text, searches: [] }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: text, searches: [], attachedFileName: file?.filename },
+    ]);
+
+    const payload = file
+      ? `${text}\n\n---\nAttached file: ${file.filename}${file.truncated ? " (truncated)" : ""}\n${file.content}`
+      : text;
 
     const onToken = (token) => setStreamingText((prev) => prev + token);
 
     try {
       const conversation = activeId
-        ? await addMessageStream(activeId, text, onToken)
-        : await createConversationStream(text, onToken);
+        ? await addMessageStream(activeId, payload, onToken, deepResearch)
+        : await createConversationStream(payload, onToken, deepResearch);
 
-      setMessages(conversation.messages || []);
+      const finalMessages = conversation.messages || [];
+      // The backend only knows about the combined payload; restore the
+      // clean display text and attachment badge for the message just sent.
+      if (finalMessages.length > 0) {
+        const lastUserIndex = [...finalMessages].map((m) => m.role).lastIndexOf("user");
+        if (lastUserIndex !== -1) {
+          finalMessages[lastUserIndex] = {
+            ...finalMessages[lastUserIndex],
+            content: text,
+            attachedFileName: file?.filename,
+          };
+        }
+      }
+      setMessages(finalMessages);
       if (!activeId) {
         setActiveId(conversation._id);
       }
@@ -209,10 +232,61 @@ function App() {
     }
   }
 
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text || loading) return;
+    setDraft("");
+    const file = attachedFile;
+    setAttachedFile(null);
+    await submitMessage(text, file);
+  }
+
+  async function handleFileSelect(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setError("");
+    setAttaching(true);
+    try {
+      const result = await extractFileText(file);
+      setAttachedFile(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAttaching(false);
+    }
+  }
+
   function handleKeyDown(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+    }
+  }
+
+  async function handleEditMessage(index, text) {
+    if (!activeId || loading) return;
+
+    const previousMessages = messages;
+    setError("");
+    setLoading(true);
+    setStreamingText("");
+    setMessages((prev) => [...prev.slice(0, index), { role: "user", content: text, searches: [] }]);
+
+    const onToken = (token) => setStreamingText((prev) => prev + token);
+
+    try {
+      const conversation = await editMessageStream(activeId, index, text, onToken);
+      setMessages(conversation.messages || []);
+      refreshConversations();
+    } catch (err) {
+      setError(err.message);
+      setMessages(previousMessages);
+    } finally {
+      setLoading(false);
+      setStreamingText("");
     }
   }
 
@@ -317,6 +391,12 @@ function App() {
                   content={m.content}
                   searches={m.searches}
                   toolCalls={m.toolCalls}
+                  attachedFileName={m.attachedFileName}
+                  followUps={i === messages.length - 1 && !loading ? m.followUps : undefined}
+                  onFollowUpClick={submitMessage}
+                  onEdit={
+                    m.role === "user" && !loading ? (text) => handleEditMessage(i, text) : undefined
+                  }
                 />
               ))}
               {loading && (
@@ -356,7 +436,69 @@ function App() {
             </div>
           )}
 
+          <div className="composer-modes">
+            <button
+              type="button"
+              className="mode-pill"
+              data-active={deepResearch}
+              onClick={() => setDeepResearch((v) => !v)}
+              aria-pressed={deepResearch}
+            >
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                <line x1="10.6" y1="10.6" x2="14" y2="14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+              Deep research
+            </button>
+          </div>
+
+          {attachedFile && (
+            <div className="attached-file-chip">
+              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  d="M4 2h5l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"
+                />
+              </svg>
+              <span>{attachedFile.filename}</span>
+              <button type="button" onClick={() => setAttachedFile(null)} aria-label="Remove attached file">
+                ×
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="composer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.md,.csv,text/plain,text/markdown,text/csv,application/pdf"
+              onChange={handleFileSelect}
+              hidden
+            />
+            <button
+              type="button"
+              className="attach-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || attaching}
+              aria-label="Attach a file"
+            >
+              {attaching ? (
+                <span className="spinner" />
+              ) : (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 6.5 8.2 11.8a2.5 2.5 0 1 1-3.5-3.5l5.8-5.8a4 4 0 0 1 5.6 5.6l-6 6"
+                  />
+                </svg>
+              )}
+            </button>
             <button
               type="button"
               className="mic-button"
