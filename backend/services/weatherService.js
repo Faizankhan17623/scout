@@ -27,6 +27,18 @@ const WEATHER_CODES = {
   99: "Thunderstorm with heavy hail",
 };
 
+// Buckets each WMO code into a small icon set the frontend can render
+// without needing the full code table.
+function iconFor(code) {
+  if (code === 0 || code === 1) return "sunny";
+  if (code === 2) return "partly-cloudy";
+  if (code === 3 || code === 45 || code === 48) return "cloudy";
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return "rainy";
+  if ([71, 73, 75].includes(code)) return "snowy";
+  if ([95, 96, 99].includes(code)) return "stormy";
+  return "cloudy";
+}
+
 async function getWeather(location) {
   const { data: geo } = await axios.get(GEOCODE_URL, {
     params: { name: location, count: 1 },
@@ -55,12 +67,16 @@ async function getWeather(location) {
       humidityPercent: forecast.current.relative_humidity_2m,
       windSpeedKmh: forecast.current.wind_speed_10m,
       condition: WEATHER_CODES[forecast.current.weather_code] || "Unknown",
+      icon: iconFor(forecast.current.weather_code),
     },
-    daily: forecast.daily.time.map((date, i) => ({
+    // Skip today (index 0, already covered by `current`) and show the
+    // next 2 days, matching a typical mobile weather-app forecast strip.
+    daily: forecast.daily.time.slice(1, 3).map((date, i) => ({
       date,
-      maxTemperatureC: forecast.daily.temperature_2m_max[i],
-      minTemperatureC: forecast.daily.temperature_2m_min[i],
-      condition: WEATHER_CODES[forecast.daily.weather_code[i]] || "Unknown",
+      maxTemperatureC: forecast.daily.temperature_2m_max[i + 1],
+      minTemperatureC: forecast.daily.temperature_2m_min[i + 1],
+      condition: WEATHER_CODES[forecast.daily.weather_code[i + 1]] || "Unknown",
+      icon: iconFor(forecast.daily.weather_code[i + 1]),
     })),
   };
 }

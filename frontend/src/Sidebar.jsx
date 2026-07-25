@@ -1,3 +1,45 @@
+const THEME_LABELS = { system: "System theme", light: "Light theme", dark: "Dark theme" };
+
+function ThemeIcon({ theme }) {
+  if (theme === "light") {
+    return (
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <circle cx="10" cy="10" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+          <line x1="10" y1="1.5" x2="10" y2="3.5" />
+          <line x1="10" y1="16.5" x2="10" y2="18.5" />
+          <line x1="1.5" y1="10" x2="3.5" y2="10" />
+          <line x1="16.5" y1="10" x2="18.5" y2="10" />
+          <line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
+          <line x1="14.4" y1="14.4" x2="15.8" y2="15.8" />
+          <line x1="4.2" y1="15.8" x2="5.6" y2="14.4" />
+          <line x1="14.4" y1="5.6" x2="15.8" y2="4.2" />
+        </g>
+      </svg>
+    );
+  }
+  if (theme === "dark") {
+    return (
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+          d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9Z"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <rect x="2.5" y="4" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <line x1="7" y1="17" x2="13" y2="17" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="10" y1="14" x2="10" y2="17" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function Sidebar({
   conversations,
   activeId,
@@ -9,6 +51,8 @@ function Sidebar({
   loading,
   width,
   onResizeStart,
+  theme,
+  onCycleTheme,
 }) {
   function handleDelete(e, id) {
     e.stopPropagation();
@@ -97,6 +141,17 @@ function Sidebar({
             </button>
           ))}
         </nav>
+
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={onCycleTheme}
+          tabIndex={collapsed ? -1 : 0}
+          aria-label={`Theme: ${THEME_LABELS[theme]}. Click to change.`}
+        >
+          <ThemeIcon theme={theme} />
+          {THEME_LABELS[theme]}
+        </button>
       </div>
 
       {!collapsed && (

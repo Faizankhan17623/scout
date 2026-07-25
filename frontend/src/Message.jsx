@@ -2,19 +2,106 @@ import { useState } from "react";
 import ImageSlider from "./ImageSlider";
 import { speakText } from "./api";
 
+function WeatherIcon({ icon, size = 22 }) {
+  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" };
+
+  if (icon === "sunny") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+        <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+        <g {...stroke}>
+          <line x1="12" y1="1.5" x2="12" y2="4" />
+          <line x1="12" y1="20" x2="12" y2="22.5" />
+          <line x1="1.5" y1="12" x2="4" y2="12" />
+          <line x1="20" y1="12" x2="22.5" y2="12" />
+          <line x1="4.4" y1="4.4" x2="6.1" y2="6.1" />
+          <line x1="17.9" y1="17.9" x2="19.6" y2="19.6" />
+          <line x1="4.4" y1="19.6" x2="6.1" y2="17.9" />
+          <line x1="17.9" y1="6.1" x2="19.6" y2="4.4" />
+        </g>
+      </svg>
+    );
+  }
+  if (icon === "partly-cloudy") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+        <circle cx="9" cy="9" r="3.6" fill="currentColor" opacity="0.85" />
+        <path {...stroke} d="M7 20h9.5a3.8 3.8 0 0 0 .7-7.55A5.2 5.2 0 0 0 7.3 14" />
+      </svg>
+    );
+  }
+  if (icon === "rainy") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+        <path {...stroke} d="M6.5 15.5h11a3.8 3.8 0 0 0 .7-7.55A5.6 5.6 0 0 0 7.4 9.7a4 4 0 0 0-.9 5.8Z" />
+        <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+          <line x1="8.5" y1="18.5" x2="7.5" y2="21" />
+          <line x1="12.5" y1="18.5" x2="11.5" y2="21" />
+          <line x1="16.5" y1="18.5" x2="15.5" y2="21" />
+        </g>
+      </svg>
+    );
+  }
+  if (icon === "snowy") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+        <path {...stroke} d="M6.5 14.5h11a3.8 3.8 0 0 0 .7-7.55A5.6 5.6 0 0 0 7.4 8.7a4 4 0 0 0-.9 5.8Z" />
+        <g stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+          <line x1="8.5" y1="18" x2="8.5" y2="21.5" />
+          <line x1="8.5" y1="18" x2="7" y2="19" />
+          <line x1="8.5" y1="18" x2="10" y2="19" />
+          <line x1="15.5" y1="18" x2="15.5" y2="21.5" />
+          <line x1="15.5" y1="18" x2="14" y2="19" />
+          <line x1="15.5" y1="18" x2="17" y2="19" />
+        </g>
+      </svg>
+    );
+  }
+  if (icon === "stormy") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+        <path {...stroke} d="M6.5 13.5h11a3.8 3.8 0 0 0 .7-7.55A5.6 5.6 0 0 0 7.4 7.7a4 4 0 0 0-.9 5.8Z" />
+        <path fill="currentColor" d="m13 15-3 5h2.4l-1.2 4 4.3-6h-2.4l1.2-3Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path {...stroke} d="M6.5 16.5h11a3.8 3.8 0 0 0 .7-7.55A5.6 5.6 0 0 0 7.4 10.7a4 4 0 0 0-.9 5.8Z" />
+    </svg>
+  );
+}
+
 function WeatherCard({ data }) {
   return (
-    <div className="tool-card" data-kind="weather">
-      <div className="tool-card-heading">{data.location}</div>
-      <div className="tool-card-current">
-        <span className="tool-card-temp">{Math.round(data.current.temperatureC)}°C</span>
-        <span className="tool-card-condition">{data.current.condition}</span>
+    <div className="weather-card">
+      <div className="weather-card-top">
+        <div>
+          <div className="weather-card-location">{data.location}</div>
+          <div className="weather-card-condition">{data.current.condition}</div>
+        </div>
+        <div className="weather-card-icon">
+          <WeatherIcon icon={data.current.icon} size={34} />
+        </div>
       </div>
-      <div className="tool-card-daily">
+
+      <div className="weather-card-temp">{Math.round(data.current.temperatureC)}°</div>
+
+      <div className="weather-card-meta">
+        <span>💧 {data.current.humidityPercent}%</span>
+        <span>💨 {Math.round(data.current.windSpeedKmh)} km/h</span>
+      </div>
+
+      <div className="weather-card-forecast">
         {data.daily.map((day) => (
-          <div key={day.date} className="tool-card-day">
-            <span>{day.date.slice(5)}</span>
-            <span>{Math.round(day.maxTemperatureC)}° / {Math.round(day.minTemperatureC)}°</span>
+          <div key={day.date} className="weather-card-forecast-day">
+            <span className="weather-card-forecast-label">
+              {new Date(day.date).toLocaleDateString(undefined, { weekday: "short" })}
+            </span>
+            <WeatherIcon icon={day.icon} size={20} />
+            <span className="weather-card-forecast-temps">
+              <strong>{Math.round(day.maxTemperatureC)}°</strong> {Math.round(day.minTemperatureC)}°
+            </span>
           </div>
         ))}
       </div>

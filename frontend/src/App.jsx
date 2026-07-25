@@ -39,6 +39,7 @@ function App() {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [theme, setTheme] = useState(() => localStorage.getItem("scout-theme") || "system");
 
   const textareaRef = useRef(null);
   const threadEndRef = useRef(null);
@@ -59,6 +60,20 @@ function App() {
       .catch(() => {})
       .finally(() => setAppReady(true));
   }, [refreshConversations]);
+
+  useEffect(() => {
+    if (theme === "system") {
+      document.documentElement.removeAttribute("data-theme");
+      localStorage.removeItem("scout-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("scout-theme", theme);
+    }
+  }, [theme]);
+
+  function cycleTheme() {
+    setTheme((prev) => (prev === "system" ? "light" : prev === "light" ? "dark" : "system"));
+  }
 
   useEffect(() => {
     if (!appReady) return;
@@ -271,6 +286,8 @@ function App() {
         loading={loading}
         width={sidebarWidth}
         onResizeStart={handleResizeStart}
+        theme={theme}
+        onCycleTheme={cycleTheme}
       />
 
       <main className="chat-pane">
