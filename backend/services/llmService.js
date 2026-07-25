@@ -130,6 +130,21 @@ async function readStreamAsText(stream) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+// Some models occasionally hallucinate a tool call as plain text instead of
+// using the structured tool_calls delta (e.g. `<get_weather>{"location":
+// "Pune"}"</function>` leaking straight into the reply). This detects that
+// shape, scoped to the actual registered tool names only, so it never
+// touches unrelated angle-bracket content like HTML/JSX in a code answer.
+const TOOL_NAMES = tools.map((t) => t.function.name).join("|");
+const FAKE_TOOL_CALL_PATTERN = new RegExp(
+  `<\\|?/?(?:${TOOL_NAMES})\\|?>\\s*\\{[^{}]*\\}\\s*"?\\s*(?:<\\/?function>)?`,
+  "gi"
+);
+
+function stripFakeToolCallSyntax(text) {
+  return text.replace(FAKE_TOOL_CALL_PATTERN, "").trim();
+}
+
 async function streamLLM(messages, onToken) {
   let response;
   try {
@@ -161,6 +176,11 @@ async function streamLLM(messages, onToken) {
   let content = "";
   const toolCalls = [];
   let buffer = "";
+  // Content is held back until the stream ends rather than forwarded
+  // token-by-token, so a hallucinated tool-call string never reaches the
+  // UI even mid-stream. This trades true incremental streaming for
+  // correctness — see runAgentStream, which fakes token pacing on replay.
+  const rawTokens = [];
 
   await new Promise((resolve, reject) => {
     response.data.on("data", (chunk) => {
@@ -186,7 +206,7 @@ async function streamLLM(messages, onToken) {
 
         if (delta.content) {
           content += delta.content;
-          onToken(delta.content);
+          rawTokens.push(delta.content);
         }
 
         if (delta.tool_calls) {
@@ -209,9 +229,19 @@ async function streamLLM(messages, onToken) {
     response.data.on("error", reject);
   });
 
+  const cleaned = stripFakeToolCallSyntax(content);
+
+  if (cleaned) {
+    // Replay as chunks so the UI still gets a streaming feel, now that the
+    // full text is known to be safe to show.
+    for (const chunk of cleaned.match(/.{1,12}/gs) || []) {
+      onToken(chunk);
+    }
+  }
+
   return {
     role: "assistant",
-    content: content || null,
+    content: cleaned || null,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
   };
 }
