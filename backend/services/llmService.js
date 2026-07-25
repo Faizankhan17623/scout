@@ -217,7 +217,7 @@ async function streamLLM(messages, onToken) {
 }
 
 const SYSTEM_PROMPT =
-  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet.";
+  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it.";
 
 function buildMessages(history) {
   return [
