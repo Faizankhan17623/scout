@@ -1,4 +1,4 @@
-const { runAgent } = require("../services/llmService");
+const { runAgentStream } = require("../services/llmService");
 const Conversation = require("../models/Conversation");
 
 function titleFromMessage(text) {
@@ -24,6 +24,18 @@ async function getConversation(req, res) {
   return res.json({ conversation });
 }
 
+function startSSE(res) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+}
+
+function sendEvent(res, event, data) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 async function createConversation(req, res) {
   const { message } = req.body;
 
@@ -32,9 +44,13 @@ async function createConversation(req, res) {
   }
 
   const userMessage = message.trim();
+  startSSE(res);
 
   try {
-    const { response, searches } = await runAgent([{ role: "user", content: userMessage }]);
+    const { response, searches } = await runAgentStream(
+      [{ role: "user", content: userMessage }],
+      (token) => sendEvent(res, "token", { token })
+    );
 
     const conversation = await Conversation.create({
       title: titleFromMessage(userMessage),
@@ -44,10 +60,12 @@ async function createConversation(req, res) {
       ],
     });
 
-    return res.status(201).json({ conversation });
+    sendEvent(res, "done", { conversation });
   } catch (err) {
-    console.error("Create conversation error:", err.response?.data || err.message);
-    return res.status(502).json({ error: "Failed to get a response from the agent" });
+    console.error("Create conversation error:", err.message);
+    sendEvent(res, "error", { error: "Failed to get a response from the agent" });
+  } finally {
+    res.end();
   }
 }
 
@@ -75,6 +93,7 @@ async function addMessage(req, res) {
   }
 
   const userMessage = message.trim();
+  startSSE(res);
 
   try {
     const history = [
@@ -82,16 +101,20 @@ async function addMessage(req, res) {
       { role: "user", content: userMessage },
     ];
 
-    const { response, searches } = await runAgent(history);
+    const { response, searches } = await runAgentStream(history, (token) =>
+      sendEvent(res, "token", { token })
+    );
 
     conversation.messages.push({ role: "user", content: userMessage });
     conversation.messages.push({ role: "assistant", content: response, searches });
     await conversation.save();
 
-    return res.json({ conversation });
+    sendEvent(res, "done", { conversation });
   } catch (err) {
-    console.error("Add message error:", err.response?.data || err.message);
-    return res.status(502).json({ error: "Failed to get a response from the agent" });
+    console.error("Add message error:", err.message);
+    sendEvent(res, "error", { error: "Failed to get a response from the agent" });
+  } finally {
+    res.end();
   }
 }
 

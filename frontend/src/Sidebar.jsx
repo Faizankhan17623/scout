@@ -7,6 +7,8 @@ function Sidebar({
   collapsed,
   onToggle,
   loading,
+  width,
+  onResizeStart,
 }) {
   function handleDelete(e, id) {
     e.stopPropagation();
@@ -14,7 +16,12 @@ function Sidebar({
   }
 
   return (
-    <aside className="sidebar" data-collapsed={collapsed} aria-hidden={collapsed}>
+    <aside
+      className="sidebar"
+      data-collapsed={collapsed}
+      aria-hidden={collapsed}
+      style={collapsed ? undefined : { width: `${width}px` }}
+    >
       <div className="sidebar-inner" inert={collapsed}>
         <div className="sidebar-top">
           <div className="mark">
@@ -91,6 +98,17 @@ function Sidebar({
           ))}
         </nav>
       </div>
+
+      {!collapsed && (
+        <div
+          className="sidebar-resize-handle"
+          onMouseDown={onResizeStart}
+          onTouchStart={onResizeStart}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+        />
+      )}
     </aside>
   );
 }
