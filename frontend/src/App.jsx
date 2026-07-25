@@ -23,7 +23,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches
+  );
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = Number(localStorage.getItem("scout-sidebar-width"));
     if (stored && stored >= SIDEBAR_MIN_WIDTH && stored <= SIDEBAR_MAX_WIDTH) {
@@ -116,9 +118,16 @@ function App() {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  function closeSidebarOnMobile() {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setSidebarCollapsed(true);
+    }
+  }
+
   async function handleSelect(id) {
     setError("");
     setActiveId(id);
+    closeSidebarOnMobile();
     try {
       const data = await getConversation(id);
       setMessages(data.conversation.messages || []);
@@ -132,6 +141,7 @@ function App() {
     setMessages([]);
     setError("");
     setDraft("");
+    closeSidebarOnMobile();
     textareaRef.current?.focus();
   }
 

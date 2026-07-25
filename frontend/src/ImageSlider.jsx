@@ -1,12 +1,71 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const MAX_RETRIES = 2;
+
+function filenameFor(img, i) {
+  const base = (img.description || `scout-image-${i + 1}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return `${base || `scout-image-${i + 1}`}.jpg`;
+}
+
+function Lightbox({ image, index, onClose }) {
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(image.url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filenameFor(image, index);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(image.url, "_blank", "noreferrer");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="lightbox" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+        <img src={image.url} alt={image.description || "Generated image"} />
+        <div className="lightbox-controls">
+          <button type="button" className="lightbox-button" onClick={handleDownload} disabled={downloading}>
+            {downloading ? <span className="spinner" /> : "Download"}
+          </button>
+          <button type="button" className="lightbox-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ImageSlider({ images }) {
   const trackRef = useRef(null);
   const [failed, setFailed] = useState({});
   const [loaded, setLoaded] = useState({});
   const [retryCount, setRetryCount] = useState({});
+  const [openIndex, setOpenIndex] = useState(null);
 
   if (images.length === 0) return null;
 
@@ -53,7 +112,13 @@ function ImageSlider({ images }) {
                       <span className="spinner" />
                     </div>
                   )}
-                  <a href={img.url} target="_blank" rel="noreferrer" title={img.description || undefined}>
+                  <button
+                    type="button"
+                    className="image-slide-open"
+                    onClick={() => setOpenIndex(i)}
+                    title={img.description || undefined}
+                    disabled={!loaded[img.url]}
+                  >
                     <img
                       src={src}
                       alt={img.description || `Related image ${i + 1}`}
@@ -61,7 +126,7 @@ function ImageSlider({ images }) {
                       onLoad={() => setLoaded((prev) => ({ ...prev, [img.url]: true }))}
                       onError={() => handleError(img.url)}
                     />
-                  </a>
+                  </button>
                 </>
               )}
             </div>
@@ -77,6 +142,9 @@ function ImageSlider({ images }) {
             ›
           </button>
         </div>
+      )}
+      {openIndex !== null && (
+        <Lightbox image={images[openIndex]} index={openIndex} onClose={() => setOpenIndex(null)} />
       )}
     </div>
   );
