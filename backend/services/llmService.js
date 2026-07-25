@@ -98,13 +98,13 @@ const tools = [
   },
 ];
 
-async function callLLM(messages) {
+async function callLLM(messages, activeTools) {
   const { data } = await axios.post(
     GROQ_URL,
     {
       model: env.llmModel,
       messages,
-      tools,
+      tools: activeTools,
       tool_choice: "auto",
     },
     {
@@ -131,13 +131,17 @@ async function readStreamAsText(stream) {
 }
 
 // Some models occasionally hallucinate a tool call as plain text instead of
-// using the structured tool_calls delta (e.g. `<get_weather>{"location":
-// "Pune"}"</function>` leaking straight into the reply). This detects that
-// shape, scoped to the actual registered tool names only, so it never
-// touches unrelated angle-bracket content like HTML/JSX in a code answer.
+// using the structured tool_calls delta — e.g. a full call like
+// `<get_weather>{"location": "Pune"}"</function>`, or just a stray leftover
+// tag like `</read_page>` with nothing else in the reply. Both are scoped to
+// the actual registered tool names (plus the generic "function" tag) only,
+// so this never touches unrelated angle-bracket content like HTML/JSX in a
+// code answer.
 const TOOL_NAMES = tools.map((t) => t.function.name).join("|");
+const TAG_NAMES = `${TOOL_NAMES}|function`;
 const FAKE_TOOL_CALL_PATTERN = new RegExp(
-  `<\\|?/?(?:${TOOL_NAMES})\\|?>\\s*\\{[^{}]*\\}\\s*"?\\s*(?:<\\/?function>)?`,
+  `<\\|?/?(?:${TOOL_NAMES})\\|?>\\s*\\{[^{}]*\\}\\s*"?\\s*(?:<\\/?function>)?` + // full call
+    `|<\\|?/?(?:${TAG_NAMES})\\|?>`, // bare open/close tag left over
   "gi"
 );
 
@@ -145,7 +149,7 @@ function stripFakeToolCallSyntax(text) {
   return text.replace(FAKE_TOOL_CALL_PATTERN, "").trim();
 }
 
-async function streamLLM(messages, onToken) {
+async function streamLLM(messages, onToken, activeTools) {
   let response;
   try {
     response = await axios.post(
@@ -153,7 +157,7 @@ async function streamLLM(messages, onToken) {
       {
         model: env.llmModel,
         messages,
-        tools,
+        tools: activeTools,
         tool_choice: "auto",
         stream: true,
       },
@@ -247,7 +251,7 @@ async function streamLLM(messages, onToken) {
 }
 
 const SYSTEM_PROMPT =
-  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it. If the user's message includes an 'Attached file:' section, treat its content as the primary, authoritative source for answering — prefer it over web_search or prior knowledge, since it's exactly what the user wants discussed.";
+  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), and read_page (fetch the full text of a specific URL). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it. If the user's message includes an 'Attached file:' section, answer directly from that content — it is the full document, already provided to you.";
 
 const DEEP_RESEARCH_SUFFIX =
   " Deep research mode is ON: this question needs a thorough answer. Before answering, use web_search multiple times with different, complementary queries to cover the topic from several angles, and use read_page on the most promising results to get full context rather than relying on snippets alone. Then produce a well-organized, structured report with headings and a brief summary of sources — not a short answer.";
@@ -257,6 +261,22 @@ function buildMessages(history, { deepResearch = false } = {}) {
     { role: "system", content: deepResearch ? SYSTEM_PROMPT + DEEP_RESEARCH_SUFFIX : SYSTEM_PROMPT },
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
+}
+
+// The small/fast models used here don't reliably follow a prompt-only
+// instruction to skip search tools when a file is attached (observed:
+// searching the web anyway, or inventing a fake read_page call for the
+// file). Actually removing the retrieval tools from the request when the
+// latest user message carries attached-file content is the only fix that
+// held up under repeated testing — generate_image stays available since
+// it's unrelated to information retrieval.
+const RETRIEVAL_TOOL_NAMES = new Set(["web_search", "wikipedia_lookup", "read_page"]);
+const toolsWithoutRetrieval = tools.filter((t) => !RETRIEVAL_TOOL_NAMES.has(t.function.name));
+
+function toolsFor(history) {
+  const latestUserMessage = [...history].reverse().find((m) => m.role === "user");
+  const hasAttachedFile = latestUserMessage?.content?.includes("\nAttached file:");
+  return hasAttachedFile ? toolsWithoutRetrieval : tools;
 }
 
 const MAX_TOOL_ROUNDS = 5;
@@ -339,16 +359,17 @@ async function executeToolCalls(message, messages, searches, toolCalls) {
 // clear error instead of persisting an empty assistant message.
 async function runAgent(history, { deepResearch = false } = {}) {
   const messages = buildMessages(history, { deepResearch });
+  const activeTools = toolsFor(history);
   const searches = [];
   const toolCalls = [];
   const maxRounds = deepResearch ? MAX_TOOL_ROUNDS_DEEP : MAX_TOOL_ROUNDS;
 
   for (let round = 0; round < maxRounds; round += 1) {
-    let message = await callLLM(messages);
+    let message = await callLLM(messages, activeTools);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
       if (!message.content) {
-        message = await callLLM(messages);
+        message = await callLLM(messages, activeTools);
         if (!message.tool_calls?.length && !message.content) {
           throw new Error("The model returned an empty response. Please try again.");
         }
@@ -369,16 +390,17 @@ async function runAgent(history, { deepResearch = false } = {}) {
 // not stream tool-call arguments as readable text.
 async function runAgentStream(history, onToken, { deepResearch = false } = {}) {
   const messages = buildMessages(history, { deepResearch });
+  const activeTools = toolsFor(history);
   const searches = [];
   const toolCalls = [];
   const maxRounds = deepResearch ? MAX_TOOL_ROUNDS_DEEP : MAX_TOOL_ROUNDS;
 
   for (let round = 0; round < maxRounds; round += 1) {
-    let message = await streamLLM(messages, onToken);
+    let message = await streamLLM(messages, onToken, activeTools);
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
       if (!message.content) {
-        message = await streamLLM(messages, onToken);
+        message = await streamLLM(messages, onToken, activeTools);
         if (!message.tool_calls?.length && !message.content) {
           throw new Error("The model returned an empty response. Please try again.");
         }
