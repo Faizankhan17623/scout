@@ -100,3 +100,33 @@ export function createConversationStream(message, onToken) {
 export function addMessageStream(id, message, onToken) {
   return streamRequest(`/conversations/${id}/messages`, message, onToken);
 }
+
+export async function transcribeAudio(blob) {
+  const form = new FormData();
+  form.append("audio", blob, "recording.webm");
+
+  const res = await fetch(`${API_URL}/voice/transcribe`, {
+    method: "POST",
+    body: form,
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to transcribe audio");
+  }
+  return data.text;
+}
+
+export async function speakText(text) {
+  const res = await fetch(`${API_URL}/voice/speak`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to synthesize speech");
+  }
+  return res.blob();
+}

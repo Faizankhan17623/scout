@@ -17,11 +17,23 @@ const searchCallSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const toolCallSchema = new mongoose.Schema(
+  {
+    tool: { type: String, required: true },
+    args: { type: mongoose.Schema.Types.Mixed },
+    kind: { type: String, required: true },
+    data: { type: mongoose.Schema.Types.Mixed },
+    images: { type: [imageSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     role: { type: String, enum: ["user", "assistant"], required: true },
     content: { type: String, required: true },
     searches: { type: [searchCallSchema], default: [] },
+    toolCalls: { type: [toolCallSchema], default: [] },
   },
   { timestamps: true }
 );

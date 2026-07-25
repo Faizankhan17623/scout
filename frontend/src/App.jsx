@@ -7,6 +7,7 @@ import {
   deleteConversation,
   createConversationStream,
   addMessageStream,
+  transcribeAudio,
 } from "./api";
 import "./App.css";
 
@@ -33,9 +34,14 @@ function App() {
   const [resizing, setResizing] = useState(false);
   const [appReady, setAppReady] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
 
   const textareaRef = useRef(null);
   const threadEndRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -185,6 +191,55 @@ function App() {
     }
   }
 
+  async function handleMicClick() {
+    setVoiceError("");
+
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVoiceError("Voice input isn't supported in this browser");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setRecording(false);
+
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (blob.size === 0) return;
+
+        setTranscribing(true);
+        try {
+          const text = await transcribeAudio(blob);
+          setDraft((prev) => (prev ? `${prev} ${text}` : text).trim());
+          textareaRef.current?.focus();
+        } catch (err) {
+          setVoiceError(err.message);
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setVoiceError("Microphone access was denied");
+    }
+  }
+
   return (
     <div className={`app${resizing ? " app-resizing" : ""}`}>
       <div className={`splash${splashVisible ? "" : " splash-hidden"}`} aria-hidden={!splashVisible}>
@@ -229,7 +284,13 @@ function App() {
           <div className="thread">
             <div className="thread-inner">
               {messages.map((m, i) => (
-                <Message key={m._id || i} role={m.role} content={m.content} searches={m.searches} />
+                <Message
+                  key={m._id || i}
+                  role={m.role}
+                  content={m.content}
+                  searches={m.searches}
+                  toolCalls={m.toolCalls}
+                />
               ))}
               {loading && (
                 <div className="message" data-role="assistant">
@@ -261,14 +322,44 @@ function App() {
               {error}
             </div>
           )}
+          {voiceError && (
+            <div className="error" role="alert">
+              <span className="error-glyph">!</span>
+              {voiceError}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="composer">
+            <button
+              type="button"
+              className="mic-button"
+              data-recording={recording}
+              onClick={handleMicClick}
+              disabled={loading || transcribing}
+              aria-label={recording ? "Stop recording" : "Record voice message"}
+              aria-pressed={recording}
+            >
+              {transcribing ? (
+                <span className="spinner" />
+              ) : (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+                  <rect x="7" y="2" width="6" height="10" rx="3" fill="currentColor" />
+                  <path
+                    d="M4 9.5a6 6 0 0 0 12 0M10 15.5v2.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
+            </button>
             <textarea
               ref={textareaRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Scout something…"
+              placeholder={recording ? "Listening…" : "Ask Scout something…"}
               rows={1}
               disabled={loading}
             />

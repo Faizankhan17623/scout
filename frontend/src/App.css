@@ -841,6 +841,137 @@
   border-top-color: #180a03;
 }
 
+.mic-button {
+  background: transparent !important;
+  color: var(--fg-dim) !important;
+  border: 1px solid var(--line);
+}
+
+.mic-button:hover:not(:disabled) {
+  color: var(--fg) !important;
+  border-color: var(--fg-dim);
+}
+
+.mic-button[data-recording="true"] {
+  background: color-mix(in srgb, var(--danger) 14%, transparent) !important;
+  color: var(--danger) !important;
+  border-color: var(--danger);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.mic-button .spinner {
+  border-color: color-mix(in srgb, var(--fg) 20%, transparent);
+  border-top-color: var(--signal);
+}
+
+/* ---------- Tool cards ---------- */
+
+.tool-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.tool-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface-raised);
+  color: inherit;
+  text-decoration: none;
+  max-width: 420px;
+  transition: border-color 0.15s ease;
+}
+
+a.tool-card:hover {
+  border-color: var(--signal);
+}
+
+.tool-card-heading {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.tool-card-extract {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--fg-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tool-card-current {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.tool-card-temp {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.tool-card-condition {
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+}
+
+.tool-card-daily {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.tool-card-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+}
+
+/* ---------- Listen button ---------- */
+
+.listen-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.listen-button:hover:not(:disabled) {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+.listen-button:disabled {
+  cursor: default;
+}
+
+.listen-button .spinner {
+  width: 11px;
+  height: 11px;
+}
+
 .composer-hint {
   text-align: center;
   margin: 0.45rem 0 1.1rem;

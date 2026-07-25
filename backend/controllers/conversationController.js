@@ -47,7 +47,7 @@ async function createConversation(req, res) {
   startSSE(res);
 
   try {
-    const { response, searches } = await runAgentStream(
+    const { response, searches, toolCalls } = await runAgentStream(
       [{ role: "user", content: userMessage }],
       (token) => sendEvent(res, "token", { token })
     );
@@ -56,7 +56,7 @@ async function createConversation(req, res) {
       title: titleFromMessage(userMessage),
       messages: [
         { role: "user", content: userMessage },
-        { role: "assistant", content: response, searches },
+        { role: "assistant", content: response, searches, toolCalls },
       ],
     });
 
@@ -101,12 +101,12 @@ async function addMessage(req, res) {
       { role: "user", content: userMessage },
     ];
 
-    const { response, searches } = await runAgentStream(history, (token) =>
+    const { response, searches, toolCalls } = await runAgentStream(history, (token) =>
       sendEvent(res, "token", { token })
     );
 
     conversation.messages.push({ role: "user", content: userMessage });
-    conversation.messages.push({ role: "assistant", content: response, searches });
+    conversation.messages.push({ role: "assistant", content: response, searches, toolCalls });
     await conversation.save();
 
     sendEvent(res, "done", { conversation });

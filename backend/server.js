@@ -3,6 +3,7 @@ const cors = require("cors");
 const env = require("./config/env");
 const connectDB = require("./config/db");
 const conversationRoutes = require("./routes/conversationRoutes");
+const voiceRoutes = require("./routes/voiceRoutes");
 
 const app = express();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api", conversationRoutes);
+app.use("/api", voiceRoutes);
 
 connectDB().then(() => {
   app.listen(env.port, () => {
