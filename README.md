@@ -5,7 +5,8 @@ information. Ask a question, and Scout (running on Groq's free-tier LLM API)
 decides whether to answer directly or call a tool first: search the live web,
 check the weather, look something up on Wikipedia, read a specific page in
 full, or generate an image — then streams back an answer with a trace of
-what it did. Voice in and voice out are also supported.
+what it did. Voice in and voice out are also supported, along with an
+optional deep research mode, file attachments, and message editing.
 
 ## Architecture
 
@@ -20,8 +21,27 @@ the backend asks the Groq LLM to respond → if the LLM calls a tool (web
 search, weather, image generation, Wikipedia lookup, or full-page read), the
 backend executes it and feeds the result back to the LLM → the LLM produces
 a final answer, streamed token-by-token to the frontend → the full
-conversation (including which tools were called and their results) is saved
-to MongoDB.
+conversation (including which tools were called and their results, plus a
+few suggested follow-up questions) is saved to MongoDB under a per-browser
+session token, so a returning visitor sees their own conversation history
+with no login required.
+
+## Other features
+
+- **Deep research mode** — a toggle in the composer that tells the agent to
+  run multiple complementary `web_search` calls, follow up with `read_page`
+  on the best results, and produce a structured, multi-section report
+  instead of a short answer (up to 10 tool-call rounds instead of the
+  usual 5).
+- **File attachments** — upload a PDF, `.txt`, `.md`, or `.csv` file
+  (parsed server-side, extracted text capped at 12,000 characters) and ask
+  questions about it; retrieval tools are automatically disabled for that
+  turn so the model answers from the attached content instead of searching.
+- **Message editing** — edit a previous message to branch the conversation
+  from that point, discarding everything after it and regenerating the
+  reply.
+- **Follow-up suggestions** — after each reply, 2-3 suggested follow-up
+  questions are generated and shown for one-click asking.
 
 ## Tools available to the agent
 
@@ -93,12 +113,22 @@ sidebar width is drag-resizable and persisted per-browser.
 
 ## API
 
+All `/api/conversations*` endpoints require an `X-Session-Token` header — a
+random per-browser token the frontend generates and persists in
+`localStorage` (30-day sliding expiry). It scopes conversations to that
+browser with no login; there is no cross-device sync. Requests to
+`POST /api/conversations` without the header are rejected with 400, and
+`GET /api/conversations` returns an empty list without one.
+
 ### `POST /api/conversations` — start a new conversation (SSE stream)
 
 Request:
 ```json
-{ "message": "What's the weather in Lahore right now?" }
+{ "message": "What's the weather in Lahore right now?", "deepResearch": false }
 ```
+
+`deepResearch` is optional (default `false`); set it to `true` to enable
+[deep research mode](#other-features) for this turn.
 
 Streams `token` events as the reply is generated, then a final `done` event
 with the saved conversation:
@@ -110,27 +140,50 @@ event: done
 data: { "conversation": { "_id": "...", "title": "...", "messages": [ ... ] } }
 ```
 
-Each assistant message includes `searches` (web_search results/images) and
+Each assistant message includes `searches` (web_search results/images),
 `toolCalls` (results from the other four tools, each shaped as
-`{ tool, args, kind, data, images }`).
+`{ tool, args, kind, data, images }`), and `followUps` (2-3 suggested
+follow-up questions).
 
 ### `POST /api/conversations/:id/messages` — continue a conversation
 
 Same request/response shape as above, appended to an existing conversation.
 
+### `PUT /api/conversations/:id/messages/:index` — edit a message
+
+Request: `{ "message": "..." }` (no `deepResearch` support). `:index` must
+point at an existing user message; that message and everything after it in
+the conversation are replaced with the edited message and a freshly
+generated reply — i.e. this branches the conversation from that point.
+Same SSE response shape as the two endpoints above.
+
 ### `GET /api/conversations` — list conversations
+
+Returns only conversations belonging to the caller's session token.
 
 ### `GET /api/conversations/:id` — fetch one conversation
 
 ### `DELETE /api/conversations/:id` — delete a conversation
 
+### `POST /api/files/extract` — extract text from an uploaded file
+
+Multipart form upload, field name `file`. Accepts PDF, `.txt`, `.md`, and
+`.csv` (max 10 MB). Returns
+`{ "filename": "...", "content": "...", "truncated": false }` — extracted
+text is capped at 12,000 characters. The frontend appends the returned
+content to the next chat message as an "Attached file" section, and the
+backend disables web-search-style tools for that turn so the model answers
+from the attachment instead of searching.
+
 ### `POST /api/voice/transcribe` — speech-to-text
 
-Multipart form upload, field name `audio`. Returns `{ "text": "..." }`.
+Multipart form upload, field name `audio` (max 25 MB). Returns
+`{ "text": "..." }`.
 
 ### `POST /api/voice/speak` — text-to-speech
 
-Request: `{ "text": "..." }`. Returns raw `audio/wav` bytes.
+Request: `{ "text": "...", "voice": "troy" }` (`voice` optional, defaults to
+`"troy"`). Returns raw `audio/wav` bytes.
 
 ### `GET /api/health`
 
