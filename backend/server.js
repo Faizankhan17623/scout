@@ -12,6 +12,10 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+if (!env.jwtSecret) {
+  console.warn("WARNING: JWT_SECRET is not set — admin login will fail until it is configured.");
+}
+
 app.use(cors({ origin: env.corsOrigin, allowedHeaders: ["Content-Type", "X-Session-Token", "Authorization"] }));
 app.use(express.json());
 app.use(trackVisit);

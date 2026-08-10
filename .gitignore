@@ -1,2 +1,4 @@
 .claude/
 linkedin-post.txt
+.vercel
+.env*
