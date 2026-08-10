@@ -50,6 +50,10 @@ export function getVisits(page = 1, limit = 50) {
   return adminRequest(`/visits?page=${page}&limit=${limit}`);
 }
 
+export function getUniqueIps(page = 1, limit = 50) {
+  return adminRequest(`/ips?page=${page}&limit=${limit}`);
+}
+
 export function getActivity(days = 14) {
   return adminRequest(`/activity?days=${days}`);
 }

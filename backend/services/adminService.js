@@ -52,6 +52,35 @@ async function getVisits({ page = 1, limit = 50 }) {
   return { visits, total, page, limit };
 }
 
+async function getUniqueIps({ page = 1, limit = 50 }) {
+  const skip = (page - 1) * limit;
+
+  const [ips, totalAgg] = await Promise.all([
+    Visit.aggregate([
+      { $match: { ip: { $ne: "" } } },
+      {
+        $group: {
+          _id: "$ip",
+          visitCount: { $sum: 1 },
+          firstSeen: { $min: "$createdAt" },
+          lastSeen: { $max: "$createdAt" },
+        },
+      },
+      { $sort: { visitCount: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      { $project: { _id: 0, ip: "$_id", visitCount: 1, firstSeen: 1, lastSeen: 1 } },
+    ]),
+    Visit.aggregate([
+      { $match: { ip: { $ne: "" } } },
+      { $group: { _id: "$ip" } },
+      { $count: "total" },
+    ]),
+  ]);
+
+  return { ips, total: totalAgg[0]?.total || 0, page, limit };
+}
+
 async function getActivity({ days = 14 }) {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -81,5 +110,6 @@ module.exports = {
   issueToken,
   getSummary,
   getVisits,
+  getUniqueIps,
   getActivity,
 };

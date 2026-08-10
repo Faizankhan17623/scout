@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getSummary, getVisits, getActivity, clearAdminToken } from "./adminApi";
+import { getSummary, getVisits, getUniqueIps, getActivity, clearAdminToken } from "./adminApi";
 
 const STAT_LABELS = {
   totalUsers: "Users",
@@ -12,6 +12,8 @@ const STAT_LABELS = {
 export default function AdminDashboard({ onLogout }) {
   const [summary, setSummary] = useState(null);
   const [visits, setVisits] = useState(null);
+  const [ips, setIps] = useState(null);
+  const [ipsPage, setIpsPage] = useState(1);
   const [activity, setActivity] = useState(null);
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
@@ -32,12 +34,18 @@ export default function AdminDashboard({ onLogout }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
+  useEffect(() => {
+    getUniqueIps(ipsPage, 50).then(setIps).catch(handleError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ipsPage]);
+
   function handleLogout() {
     clearAdminToken();
     onLogout();
   }
 
   const totalPages = visits ? Math.max(1, Math.ceil(visits.total / visits.limit)) : 1;
+  const ipsTotalPages = ips ? Math.max(1, Math.ceil(ips.total / ips.limit)) : 1;
 
   return (
     <div className="admin-root">
@@ -86,6 +94,47 @@ export default function AdminDashboard({ onLogout }) {
           </table>
         ) : (
           <div className="admin-loading">No activity yet.</div>
+        )}
+      </div>
+
+      <div className="admin-section">
+        <h2>Unique IPs</h2>
+        {ips && ips.ips.length > 0 ? (
+          <>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>Visits</th>
+                  <th>First seen</th>
+                  <th>Last seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ips.ips.map((row) => (
+                  <tr key={row.ip}>
+                    <td>{row.ip}</td>
+                    <td>{row.visitCount}</td>
+                    <td>{new Date(row.firstSeen).toLocaleString()}</td>
+                    <td>{new Date(row.lastSeen).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="admin-pagination">
+              <button disabled={ipsPage <= 1} onClick={() => setIpsPage((p) => p - 1)}>
+                Prev
+              </button>
+              <span>
+                Page {ipsPage} of {ipsTotalPages}
+              </span>
+              <button disabled={ipsPage >= ipsTotalPages} onClick={() => setIpsPage((p) => p + 1)}>
+                Next
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="admin-loading">No IPs logged yet.</div>
         )}
       </div>
 
