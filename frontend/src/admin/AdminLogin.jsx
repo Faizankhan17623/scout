@@ -24,6 +24,9 @@ export default function AdminLogin({ onSuccess }) {
   return (
     <div className="admin-login">
       <form className="admin-login-card" onSubmit={handleSubmit}>
+        <a className="admin-brand" href="/">
+          Scout
+        </a>
         <h1>Admin sign in</h1>
         {error && <div className="admin-error">{error}</div>}
         <div className="admin-field">

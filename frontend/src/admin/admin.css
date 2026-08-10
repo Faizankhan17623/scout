@@ -23,6 +23,20 @@
   padding: 2rem;
 }
 
+.admin-brand {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--signal);
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+
+.admin-brand:hover {
+  text-decoration: underline;
+}
+
 .admin-login-card h1 {
   font-family: var(--font-mono);
   font-size: 1.1rem;
