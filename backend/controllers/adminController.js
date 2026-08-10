@@ -17,7 +17,7 @@ async function login(req, res) {
   try {
     const admin = await verifyAdminCredentials(email, password);
     if (!admin) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const token = issueToken(admin);

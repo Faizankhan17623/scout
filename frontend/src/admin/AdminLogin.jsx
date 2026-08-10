@@ -37,6 +37,7 @@ export default function AdminLogin({ onSuccess }) {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
             required
           />
         </div>
@@ -48,11 +49,12 @@ export default function AdminLogin({ onSuccess }) {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
             required
           />
         </div>
         <button className="admin-submit" type="submit" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? <span className="spinner" /> : "Sign in"}
         </button>
       </form>
     </div>

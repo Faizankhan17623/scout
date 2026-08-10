@@ -71,6 +71,11 @@
   border-color: var(--signal);
 }
 
+.admin-field input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .admin-submit {
   width: 100%;
   padding: 0.6rem;
@@ -80,6 +85,10 @@
   color: #0b0d10;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
 }
 
 .admin-submit:disabled {
@@ -87,10 +96,35 @@
   cursor: not-allowed;
 }
 
+.admin-submit .spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, #0b0d10 30%, transparent);
+  border-top-color: #0b0d10;
+  animation: admin-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-submit .spinner {
+    animation: none;
+  }
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .admin-error {
   color: var(--danger);
   font-size: 0.85rem;
   margin-bottom: 1rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .admin-header {

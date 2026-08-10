@@ -189,6 +189,26 @@ Request: `{ "text": "...", "voice": "troy" }` (`voice` optional, defaults to
 
 Simple liveness check, returns `{ "status": "ok" }`.
 
+## Admin dashboard
+
+A password-protected admin dashboard is available at a private, unlisted
+frontend route — the path is intentionally **not documented here** since
+this repo is public; it lives only in the `VITE_ADMIN_PATH` environment
+variable (frontend `.env`, not committed). It shows total users, a visit
+log with IP addresses, a per-IP breakdown, and conversation/message
+volume, backed by a small set of `/api/admin/*` endpoints protected by a
+JWT-based login (`POST /api/admin/login`, `requireAdmin` middleware).
+
+To create or reset the admin login, run against the target database:
+
+```bash
+node backend/scripts/seedAdmin.js <email> <password>
+```
+
+Required backend env vars: `JWT_SECRET` (random secret used to sign admin
+session tokens) and `ADMIN_TOKEN_TTL` (session length, defaults to `7d`).
+See `backend/.env.example` and `frontend/.env.example` for the full list.
+
 ## Free-tier limitations
 
 Everything this project talks to runs on a free plan. These limits are
