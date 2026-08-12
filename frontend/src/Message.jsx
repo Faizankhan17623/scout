@@ -133,10 +133,27 @@ function ReadPageCard({ data }) {
   );
 }
 
+function GithubRepoCard({ data }) {
+  const summary = data.description || (data.readme ? "See README" : "No README — summarized from source");
+  const meta = [data.language, `★ ${data.stars}`].filter(Boolean).join(" · ");
+  return (
+    <a className="tool-card" data-kind="github-repo" href={data.url} target="_blank" rel="noreferrer">
+      <div className="tool-card-heading">
+        {data.owner}/{data.repo}
+      </div>
+      <p className="tool-card-extract">
+        {summary}
+        {meta ? ` · ${meta}` : ""}
+      </p>
+    </a>
+  );
+}
+
 function ToolCallCard({ call }) {
   if (call.kind === "weather") return <WeatherCard data={call.data} />;
   if (call.kind === "wikipedia") return <WikipediaCard data={call.data} />;
   if (call.kind === "read_page") return <ReadPageCard data={call.data} />;
+  if (call.kind === "github_repo") return <GithubRepoCard data={call.data} />;
   return null;
 }
 
@@ -250,7 +267,9 @@ function Message({
   const searchImages = searches.flatMap((s) => s.images || []);
   const toolImages = toolCalls.flatMap((c) => c.images || []);
   const images = [...searchImages, ...toolImages];
-  const cardCalls = toolCalls.filter((c) => c.kind === "weather" || c.kind === "wikipedia" || c.kind === "read_page");
+  const cardCalls = toolCalls.filter(
+    (c) => c.kind === "weather" || c.kind === "wikipedia" || c.kind === "read_page" || c.kind === "github_repo"
+  );
 
   if (role === "user" && editing) {
     return (
