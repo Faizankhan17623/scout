@@ -48,6 +48,28 @@ function stripCodeFence(code) {
   return fenced ? fenced[1] : code;
 }
 
+async function submit(source, languageId) {
+  const { data } = await axios.post(
+    `${JUDGE0_URL}/submissions/?base64_encoded=false&wait=true`,
+    { source_code: source, language_id: languageId },
+    { timeout: TIMEOUT_MS, headers: { "Content-Type": "application/json" } }
+  );
+  return data;
+}
+
+// The public Judge0 instance is shared and occasionally has a slow or
+// briefly-failing beat under load. One retry clears most of those without
+// making the user wait through a second full agent round-trip.
+async function submitWithRetry(source, languageId) {
+  try {
+    return await submit(source, languageId);
+  } catch (err) {
+    const transient = err.code === "ECONNABORTED" || !err.response || err.response.status >= 500;
+    if (!transient) throw err;
+    return await submit(source, languageId);
+  }
+}
+
 async function runCode(language, code) {
   const languageId = LANGUAGE_IDS[String(language || "").trim().toLowerCase()];
   if (!languageId) {
@@ -60,19 +82,18 @@ async function runCode(language, code) {
 
   let data;
   try {
-    ({ data } = await axios.post(
-      `${JUDGE0_URL}/submissions/?base64_encoded=false&wait=true`,
-      { source_code: source, language_id: languageId },
-      { timeout: TIMEOUT_MS, headers: { "Content-Type": "application/json" } }
-    ));
+    data = await submitWithRetry(source, languageId);
   } catch (err) {
     if (err.response?.status === 429) {
       throw new Error("Code execution sandbox rate limit hit — try again in a moment.");
     }
     if (err.code === "ECONNABORTED") {
-      throw new Error("Code execution timed out — the public sandbox may be under load.");
+      throw new Error("Code execution timed out twice — the public sandbox is likely overloaded right now.");
     }
-    throw new Error("Couldn't reach the code execution sandbox — try again in a moment.");
+    const status = err.response?.status;
+    throw new Error(
+      `Code execution sandbox is unavailable${status ? ` (HTTP ${status})` : ""} — try again in a moment.`
+    );
   }
 
   return {
