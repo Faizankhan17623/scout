@@ -4,9 +4,11 @@ A multi-turn agent that reaches out to live tools when it needs current
 information. Ask a question, and Scout (running on Groq's free-tier LLM API)
 decides whether to answer directly or call a tool first: search the live web,
 check the weather, look something up on Wikipedia, read a specific page in
-full, or generate an image — then streams back an answer with a trace of
+full, generate an image, explain a GitHub repository from its URL, or run a
+code snippet in a real sandbox — then streams back an answer with a trace of
 what it did. Voice in and voice out are also supported, along with an
-optional deep research mode, file attachments, and message editing.
+optional deep research mode, file attachments, message editing, and
+syntax-highlighted code blocks with a one-click copy button.
 
 ## Architecture
 
@@ -18,8 +20,9 @@ Scout/
 
 **Flow:** the frontend streams the user's prompt to the backend over SSE →
 the backend asks the Groq LLM to respond → if the LLM calls a tool (web
-search, weather, image generation, Wikipedia lookup, or full-page read), the
-backend executes it and feeds the result back to the LLM → the LLM produces
+search, weather, image generation, Wikipedia lookup, full-page read, GitHub
+repo explainer, or code execution), the backend executes it and feeds the
+result back to the LLM → the LLM produces
 a final answer, streamed token-by-token to the frontend → the full
 conversation (including which tools were called and their results, plus a
 few suggested follow-up questions) is saved to MongoDB under a per-browser
@@ -42,6 +45,9 @@ with no login required.
   reply.
 - **Follow-up suggestions** — after each reply, 2-3 suggested follow-up
   questions are generated and shown for one-click asking.
+- **Syntax-highlighted code blocks** — any code the assistant writes renders
+  in a highlighted, language-labeled block with a one-click **Copy** button,
+  the same way ChatGPT/Claude present code (via `react-syntax-highlighter`).
 
 ## Tools available to the agent
 
@@ -52,12 +58,14 @@ with no login required.
 | `generate_image` | Text-to-image generation | [Pollinations.ai](https://pollinations.ai) | No |
 | `wikipedia_lookup` | Encyclopedic summary of a topic | [Wikipedia REST API](https://en.wikipedia.org/api/rest_v1/) | No |
 | `read_page` | Fetches the full text content of a specific URL | [Jina AI Reader](https://jina.ai/reader) | Optional (raises rate limit) |
+| `explain_github_repo` | Fetches a GitHub repo's metadata, README, file tree, and key source files, then explains its purpose and architecture — falls back to reading source files directly when there's no README | [GitHub REST API](https://docs.github.com/en/rest) | Optional (raises rate limit) |
+| `run_code` | Executes a code snippet in a real sandbox (Python, JavaScript, Go, Java, C/C++, C#, Ruby, Rust, PHP, Bash, TypeScript) and returns actual stdout/stderr | [Judge0 CE](https://ce.judge0.com) | No |
 | Voice input (STT) | Transcribes a recorded voice message into the composer | Groq Whisper (`whisper-large-v3-turbo`) | Uses existing `GROQ_API_KEY` |
 | Voice output (TTS) | "Listen" button reads an assistant reply aloud | Groq Orpheus (`canopylabs/orpheus-v1-english`) | Uses existing `GROQ_API_KEY` — see note below |
 
-All five non-voice tools were chosen specifically because they're free or
-have a genuinely usable free tier — see **Free-tier limitations** below
-before relying on this in production.
+All non-voice tools were chosen specifically because they're free or have a
+genuinely usable free tier — see **Free-tier limitations** below before
+relying on this in production.
 
 ## Prerequisites
 
@@ -85,6 +93,7 @@ npm run dev             # starts on http://localhost:5000
 | `GROQ_MODEL` | Groq model name (default `openai/gpt-oss-120b`) |
 | `TAVILY_API_KEY` | Your Tavily API key |
 | `JINA_API_KEY` | **Optional.** Jina AI Reader key. Leave blank to use the keyless tier (20 req/min instead of 500 req/min) |
+| `GITHUB_TOKEN` | **Optional.** GitHub personal access token. Leave blank to use the keyless tier (60 req/hour instead of 5,000 req/hour) |
 | `MONGODB_URI` | MongoDB connection string |
 | `CORS_ORIGIN` | Allowed frontend origin (default `http://localhost:5173`) |
 
@@ -141,7 +150,7 @@ data: { "conversation": { "_id": "...", "title": "...", "messages": [ ... ] } }
 ```
 
 Each assistant message includes `searches` (web_search results/images),
-`toolCalls` (results from the other four tools, each shaped as
+`toolCalls` (results from the other tools, each shaped as
 `{ tool, args, kind, data, images }`), and `followUps` (2-3 suggested
 follow-up questions).
 
@@ -225,6 +234,8 @@ two most likely to shift).
 | **Pollinations.ai** (`generate_image`) | ~1 request per 15s anonymously (community-observed, not officially documented); faster with a free account | No API key required. Image generation can take several seconds; occasional slow or failed generations are expected on the free tier. |
 | **Wikipedia REST API** (`wikipedia_lookup`) | No hard limit; a descriptive `User-Agent` header is required by Wikimedia's usage policy | No API key. |
 | **Jina AI Reader** (`read_page`) | 20 requests/min with no key; 500 requests/min **and a fixed 10,000,000-token lifetime allowance** with a free key | The 10M tokens are a one-time allowance, not a recurring monthly quota — once spent, that key stops working entirely and needs replacing. Page content is truncated to 6,000 characters before being sent to the LLM to keep the context window reasonable. When the key is exhausted or invalid, `read_page` returns a clear error explaining this instead of a raw HTTP failure. |
+| **GitHub REST API** (`explain_github_repo`) | 60 requests/hour per IP with no token; 5,000 requests/hour with a personal access token | No signup needed for the keyless tier. README and key source files are each truncated to 6,000 characters, and the file tree to 300 entries, before being sent to the LLM. |
+| **Judge0 CE** (`run_code`) | Public community instance, no API key, but shared and unauthenticated — no published hard quota and no uptime SLA | Code runs in an isolated sandbox on Judge0's infrastructure, not on this project's server. Output is capped at 4,000 characters per stream, and requests time out after 20 seconds. Not suitable for production-critical use given the lack of an SLA. |
 
 Because every tool sits on a shared free plan, **heavy concurrent use will
 hit rate limits** — the agent has a retry-once fallback for the case where

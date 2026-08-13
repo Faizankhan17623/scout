@@ -1,11 +1,82 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import ImageSlider from "./ImageSlider";
 import { speakText } from "./api";
 
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <button type="button" className="code-copy-button" onClick={handleCopy}>
+      {copied ? (
+        <>
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <path fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" d="M3 8.5 6.5 12 13 4.5" />
+          </svg>
+          Copied
+        </>
+      ) : (
+        <>
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <rect x="5.5" y="5.5" width="8" height="8" rx="1.3" fill="none" stroke="currentColor" strokeWidth="1.3" />
+            <path fill="none" stroke="currentColor" strokeWidth="1.3" d="M3 10.5V3.8A1.3 1.3 0 0 1 4.3 2.5h6.7" />
+          </svg>
+          Copy
+        </>
+      )}
+    </button>
+  );
+}
+
+function CodeBlock({ className, children }) {
+  const match = /language-(\w+)/.exec(className || "");
+  const language = match?.[1] || "text";
+  const code = String(children).replace(/\n$/, "");
+  const prefersDark =
+    typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+
+  return (
+    <div className="code-block">
+      <div className="code-block-header">
+        <span className="code-block-lang">{language}</span>
+        <CopyButton text={code} />
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={prefersDark ? oneDark : oneLight}
+        customStyle={{ margin: 0, borderRadius: 0, background: "transparent" }}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
 const markdownComponents = {
   a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+  code: ({ node: _node, inline, className, children, ...props }) => {
+    if (inline) {
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+    return <CodeBlock className={className}>{children}</CodeBlock>;
+  },
 };
 
 function WeatherIcon({ icon, size = 22 }) {
@@ -149,11 +220,27 @@ function GithubRepoCard({ data }) {
   );
 }
 
+function CodeExecCard({ data }) {
+  const failed = data.exitCode !== 0 && data.exitCode !== null;
+  return (
+    <div className="tool-card code-exec-card" data-kind="code-exec">
+      <CodeBlock className={`language-${data.language}`}>{data.code}</CodeBlock>
+      {(data.stdout || data.stderr) && (
+        <div className="code-exec-output" data-failed={failed || undefined}>
+          <div className="code-exec-output-label">{failed ? "Error" : "Output"}</div>
+          <pre>{data.stderr || data.stdout}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolCallCard({ call }) {
   if (call.kind === "weather") return <WeatherCard data={call.data} />;
   if (call.kind === "wikipedia") return <WikipediaCard data={call.data} />;
   if (call.kind === "read_page") return <ReadPageCard data={call.data} />;
   if (call.kind === "github_repo") return <GithubRepoCard data={call.data} />;
+  if (call.kind === "code_exec") return <CodeExecCard data={call.data} />;
   return null;
 }
 
@@ -268,7 +355,12 @@ function Message({
   const toolImages = toolCalls.flatMap((c) => c.images || []);
   const images = [...searchImages, ...toolImages];
   const cardCalls = toolCalls.filter(
-    (c) => c.kind === "weather" || c.kind === "wikipedia" || c.kind === "read_page" || c.kind === "github_repo"
+    (c) =>
+      c.kind === "weather" ||
+      c.kind === "wikipedia" ||
+      c.kind === "read_page" ||
+      c.kind === "github_repo" ||
+      c.kind === "code_exec"
   );
 
   if (role === "user" && editing) {

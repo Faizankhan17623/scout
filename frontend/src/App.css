@@ -1459,6 +1459,103 @@ a.tool-card:hover {
   overflow: hidden;
 }
 
+/* ---------- Code blocks ---------- */
+
+.code-block {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0.75rem 0;
+  max-width: 100%;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.code-block-lang {
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.code-block pre {
+  overflow-x: auto;
+}
+
+.code-copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.code-copy-button:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+/* ---------- Code execution card ---------- */
+
+.code-exec-card {
+  max-width: 560px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.code-exec-card .code-block {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.code-exec-output {
+  padding: 0.75rem 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.code-exec-output-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-bottom: 0.35rem;
+}
+
+.code-exec-output[data-failed] .code-exec-output-label {
+  color: var(--danger);
+}
+
+.code-exec-output pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+}
+
+.code-exec-output[data-failed] pre {
+  color: var(--danger);
+}
+
 /* ---------- Weather card ---------- */
 
 .weather-card {

@@ -6,6 +6,7 @@ const { generateImage } = require("./imageGenService");
 const { wikipediaLookup } = require("./wikipediaService");
 const { readPage } = require("./readerService");
 const { summarizeRepo } = require("./githubRepoService");
+const { runCode } = require("./codeExecService");
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -112,6 +113,28 @@ const tools = [
           },
         },
         required: ["repoUrl"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_code",
+      description:
+        "Execute a code snippet in a sandbox and return its real stdout/stderr. Use for math, data processing, or verifying that code actually works, rather than guessing the output.",
+      parameters: {
+        type: "object",
+        properties: {
+          language: {
+            type: "string",
+            description: "The programming language to run the code in, e.g. 'python', 'javascript', 'go'.",
+          },
+          code: {
+            type: "string",
+            description: "The full source code to execute.",
+          },
+        },
+        required: ["language", "code"],
       },
     },
   },
@@ -270,7 +293,7 @@ async function streamLLM(messages, onToken, activeTools) {
 }
 
 const SYSTEM_PROMPT =
-  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), read_page (fetch the full text of a specific URL), and explain_github_repo (fetch a GitHub repo's metadata, README, file tree, and key source files). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. Use explain_github_repo whenever the user shares a GitHub link and wants to understand the project — then give a real architectural explanation covering the project's purpose, its structure (main folders/modules), key entry points, and notable dependencies or frameworks, not just a one-line restatement of the description. If the tool result has no README, base the explanation on the file tree and the key source files it fetched instead. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it. If the user's message includes an 'Attached file:' section, answer directly from that content — it is the full document, already provided to you.";
+  "You are a helpful agent with access to tools: web_search (live web search), get_weather (current + 3-day forecast), generate_image (text-to-image), wikipedia_lookup (encyclopedic summaries), read_page (fetch the full text of a specific URL), explain_github_repo (fetch a GitHub repo's metadata, README, file tree, and key source files), and run_code (execute a code snippet in a sandbox and return real stdout/stderr). Use web_search for current or factual information you're not certain about, and cite sources briefly. Use get_weather for weather questions, wikipedia_lookup for well-established factual/biographical topics, generate_image when asked to create or draw something, and read_page when you need the full content of a specific link rather than just a search snippet. Use explain_github_repo whenever the user shares a GitHub link and wants to understand the project — then give a real architectural explanation covering the project's purpose, its structure (main folders/modules), key entry points, and notable dependencies or frameworks, not just a one-line restatement of the description. If the tool result has no README, base the explanation on the file tree and the key source files it fetched instead. Always write code in a fenced Markdown code block with the correct language tag (e.g. ```python). Use run_code when the user wants code actually executed or its real output verified (e.g. a computed result, or 'run this and show me') — not for every code snippet you write, only when execution is needed or explicitly requested. When you call generate_image, the image is already generated and will be shown to the user automatically by the app — just give a short, confident reply (e.g. \"Here's your image.\"). Never say the image URL might not load, might take time, or needs to be visited manually — the UI already handles displaying it. If the user's message includes an 'Attached file:' section, answer directly from that content — it is the full document, already provided to you.";
 
 const DEEP_RESEARCH_SUFFIX =
   " Deep research mode is ON: this question needs a thorough answer. Before answering, use web_search multiple times with different, complementary queries to cover the topic from several angles, and use read_page on the most promising results to get full context rather than relying on snippets alone. Then produce a well-organized, structured report with headings and a brief summary of sources — not a short answer.";
@@ -345,6 +368,11 @@ async function runToolCall(name, args) {
   if (name === "explain_github_repo") {
     const repo = await summarizeRepo(args.repoUrl);
     return { kind: "github_repo", data: repo, forLLM: repo };
+  }
+
+  if (name === "run_code") {
+    const run = await runCode(args.language, args.code);
+    return { kind: "code_exec", data: run, forLLM: run };
   }
 
   return { kind: "unknown", forLLM: { error: `Unknown tool: ${name}` } };
