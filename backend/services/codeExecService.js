@@ -39,6 +39,15 @@ function truncate(text) {
     : text;
 }
 
+// Models occasionally pass their own displayed ```lang fence (including the
+// backtick lines) as the code argument instead of just the source inside it.
+// Strip a wrapping fence if present so execution doesn't fail on stray
+// backticks the user never wrote.
+function stripCodeFence(code) {
+  const fenced = String(code).trim().match(/^```[\w+-]*\n([\s\S]*?)\n?```$/);
+  return fenced ? fenced[1] : code;
+}
+
 async function runCode(language, code) {
   const languageId = LANGUAGE_IDS[String(language || "").trim().toLowerCase()];
   if (!languageId) {
@@ -47,11 +56,13 @@ async function runCode(language, code) {
     );
   }
 
+  const source = stripCodeFence(code);
+
   let data;
   try {
     ({ data } = await axios.post(
       `${JUDGE0_URL}/submissions/?base64_encoded=false&wait=true`,
-      { source_code: code, language_id: languageId },
+      { source_code: source, language_id: languageId },
       { timeout: TIMEOUT_MS, headers: { "Content-Type": "application/json" } }
     ));
   } catch (err) {
@@ -66,7 +77,7 @@ async function runCode(language, code) {
 
   return {
     language,
-    code,
+    code: source,
     stdout: truncate(data.stdout),
     stderr: truncate(data.stderr || data.compile_output),
     exitCode: data.status?.id === 3 ? 0 : data.status?.id ?? null,

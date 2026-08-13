@@ -131,7 +131,8 @@ const tools = [
           },
           code: {
             type: "string",
-            description: "The full source code to execute.",
+            description:
+              "The raw source code to execute — plain code only, with NO surrounding ``` markdown fence and no language tag line.",
           },
         },
         required: ["language", "code"],
